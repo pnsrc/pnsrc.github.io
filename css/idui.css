@@ -1,0 +1,48 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@100;500&display=swap');
+
+body{
+}
+
+#spooty{
+      filter: blur(4px);
+	padding: 10%;
+}
+
+#spooty-parents{
+	font-family: 'Roboto Mono', monospace;
+	width: 100%;
+	height: 30%;
+	background-attachment: fixed;
+	background-image: url('../img/bg.png');
+	background-size: 100%;
+}
+#main-spo{
+	font-family: sans-serif;
+}
+#low-spo-main{
+	text-align: center;
+}
+button{
+	--paper-ripple-opacity: var(--ripple-opacity);
+    -webkit-tap-highlight-color: transparent;
+    align-items: center;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    box-sizing: border-box;
+    color: var(--text-color);
+    cursor: pointer;
+    display: inline-flex;
+    flex-shrink: 0;
+    font-weight: 500;
+    height: var(--cr-button-height);
+    justify-content: center;
+    min-width: 5.14em;
+    outline-width: 0;
+    overflow: hidden;
+    padding: 8px 16px;
+    position: relative;
+    user-select: none;
+}
+#darkheart{
+	background-color: #A10000;
+}
