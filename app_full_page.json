@@ -1,0 +1,23 @@
+{
+    "id": "1",
+    "packet" : "com.prisma",
+    "name" : "Prisma App",
+    "type" : "app",
+    "icon" : "Sugar.png",
+    "logo" : "Sugar.png",
+    "log_avalible": true,
+    "url_download_apk" : "https://play.google.com/store/apps/details?id=com.prismapp.prism",
+    "screnshots" : [
+        "Sugar.png", "Sugar.png", "Sugar.png"
+    ],
+    "description" : "lorem",
+    "developer" : {
+        "name" : "SugarCRM, Inc.",
+        "url" : "http://www.sugarcrm.com"
+    },
+    "price" : "Free",
+    "latest_version" : "1.0.0",
+    "versions_avalible" : [
+        "1.0"
+    ]
+}

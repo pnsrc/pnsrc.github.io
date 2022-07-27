@@ -1,0 +1,23 @@
+{
+    "apps" : [
+        {
+            "id": "1",
+            "name": "Prisma",
+            "description_mini": "Тестовое приложение под номером 1",
+            "icon": "https://cdn.pixabay.com/photo/2015/10/12/15/02/apple-trees-1006377_960_720.jpg",
+            "cover": "https://cdn.pixabay.com/photo/2015/10/12/15/02/apple-trees-1006377_960_720.jpg",
+            "tag":"photo",
+            "category": "photoedit"
+        },
+        {
+            "id": "2",
+            "name": "Instagram",
+            "description_mini": "Инстаграм",
+            "icon": "https://cdn.pixabay.com/photo/2015/10/12/15/02/apple-trees-1006377_960_720.jpg",
+            "cover": "https://cdn.pixabay.com/photo/2015/10/12/15/02/apple-trees-1006377_960_720.jpg",
+            "tag":"social",
+            "category": "social"
+        }
+
+    ]
+}

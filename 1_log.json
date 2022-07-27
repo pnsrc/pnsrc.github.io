@@ -1,0 +1,18 @@
+{
+    "versions":[
+        {
+            "version":"1.0",
+            "changelog" : "add some data",
+            "date" : "2016-01-01",
+            "emergancy" : true,
+            "actual" : true
+        },
+        {
+            "version":"1.1",
+            "changelog" : "add some data",
+            "date" : "2016-01-01",
+            "emergancy" : false,
+            "actual" : false
+        }
+    ]
+}
