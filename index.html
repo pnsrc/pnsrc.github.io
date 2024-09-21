@@ -39,5 +39,26 @@
     <a href="android.settings.SETTINGS">Основные настройки</a>
     <a href="android.settings.WIFI_SETTINGS">Настройки Wi-Fi</a>
     <a href="android.settings.BLUETOOTH_SETTINGS">Настройки Bluetooth</a>
+
+    <script>
+        function requestFullscreen() {
+            if (!document.fullscreenElement) {
+                if (document.documentElement.requestFullscreen) {
+                    document.documentElement.requestFullscreen();
+                } else if (document.documentElement.mozRequestFullScreen) { // Firefox
+                    document.documentElement.mozRequestFullScreen();
+                } else if (document.documentElement.webkitRequestFullscreen) { // Chrome, Safari and Opera
+                    document.documentElement.webkitRequestFullscreen();
+                } else if (document.documentElement.msRequestFullscreen) { // IE/Edge
+                    document.documentElement.msRequestFullscreen();
+                }
+            }
+        }
+
+        // Попытка войти в полноэкранный режим при любом взаимодействии пользователя
+        document.addEventListener('click', requestFullscreen, { once: true });
+        document.addEventListener('touchstart', requestFullscreen, { once: true });
+        document.addEventListener('keydown', requestFullscreen, { once: true });
+    </script>
 </body>
 </html>
