@@ -3,7 +3,7 @@ export class RunnerGame {
   constructor(random = Math.random) {
     this.random = random;
     this.mode = 'ready';
-    this.distance = this.coins = this.heat = this.power = 0;
+    this.distance = this.coins = this.heat = this.power = this.jetpack = this.landing = 0;
     this.x = this.y = this.lean = this.jump = this.slide = 0;
     this.lane = 1;
     this.items = [];
@@ -13,16 +13,18 @@ export class RunnerGame {
   emit(type, details = {}) { this.queue.push({ type, ...details }); }
   start() {
     this.mode = 'play';
-    this.distance = this.coins = this.heat = this.power = 0;
+    this.distance = this.coins = this.heat = this.power = this.jetpack = this.landing = 0;
     this.x = this.y = this.lean = this.jump = this.slide = 0;
     this.lane = 1;
     this.items = [];
     this.queue = [];
     this.spawnTimer = 1.5;
+    this.nextJetpackDistance = 350;
     this.dodgeCooldown = this.milestone = this.combo = 0;
     this.comboTimer = 0;
     this.add(1, -12, 'coin');
     for (let i = 1; i < 5; i++) this.add(1, -12 - i * 2.7, 'coin');
+    this.add(1, -31, 'jetpack');
     this.add(1, -50, 'box');
     for (let i = 0; i < 5; i++) this.add(0, -48 - i * 2.7, 'coin');
     this.emit('start');
@@ -33,6 +35,11 @@ export class RunnerGame {
     return item;
   }
   row() {
+    if (this.jetpack > 0) {
+      const lane = Math.floor(this.random() * 3);
+      for (let i = 0; i < 8; i++) this.add(lane, -65 - i * 2.4, 'coin').altitude = 3.8;
+      return;
+    }
     const obstacleLane = Math.floor(this.random() * 3);
     const safe = (obstacleLane + 1 + Math.floor(this.random() * 2)) % 3;
     const roll = this.random();
@@ -42,17 +49,21 @@ export class RunnerGame {
       this.add(3 - obstacleLane - safe, -76, 'box');
     }
     for (let i = 0; i < 5; i++) this.add(safe, -76 - i * 2.6, 'coin');
+    if (this.distance >= this.nextJetpackDistance && !this.items.some(o => o.type === 'jetpack')) {
+      this.add(safe, -70, 'jetpack');
+      this.nextJetpackDistance = this.distance + 420;
+    }
   }
   action(action) {
     if (this.mode !== 'play') return;
     if (action === 'left' && this.lane > 0) { this.lane--; this.emit('lane'); }
     if (action === 'right' && this.lane < 2) { this.lane++; this.emit('lane'); }
-    if (action === 'jump' && this.jump <= 0) {
+    if (action === 'jump' && this.jump <= 0 && this.jetpack <= 0) {
       this.jump = .86;
       this.slide = 0;
       this.emit('jump');
     }
-    if (action === 'slide' && this.slide <= 0 && this.jump <= 0) {
+    if (action === 'slide' && this.slide <= 0 && this.jump <= 0 && this.jetpack <= 0) {
       this.slide = .85;
       this.emit('slide');
     }
@@ -63,13 +74,17 @@ export class RunnerGame {
     if (this.mode !== 'play') return this.drain();
     dt = Math.min(dt, .05);
     const powered = this.power > 0;
-    const speed = 18 + Math.min(13, this.distance / 170) + (powered ? 8 : 0);
+    const flying = this.jetpack > 0;
+    this.landing = Math.max(0, this.landing - dt);
+    this.jetpack = Math.max(0, this.jetpack - dt);
+    if (flying && this.jetpack === 0) { this.landing = 1.1; this.emit('jetpack-end'); }
+    const speed = 18 + Math.min(13, this.distance / 170) + (flying ? 10 : powered ? 8 : 0);
     this.power = Math.max(0, this.power - dt);
     if (powered && this.power === 0) this.emit('power-end');
     this.distance += speed * dt;
     this.jump = Math.max(0, this.jump - dt);
     this.slide = Math.max(0, this.slide - dt);
-    this.y = this.jump > 0 ? Math.sin(this.jump / .86 * Math.PI) * 2.25 : 0;
+    this.y = this.jetpack > 0 ? 3.8 : this.jump > 0 ? Math.sin(this.jump / .86 * Math.PI) * 2.25 : 0;
     this.x += ((this.lane - 1) * 3 - this.x) * Math.min(1, dt * 18);
     this.lean = ((this.lane - 1) * 3 - this.x) * -.12;
     this.dodgeCooldown = Math.max(0, this.dodgeCooldown - dt);
@@ -85,7 +100,12 @@ export class RunnerGame {
       const deltaX = Math.abs(this.x - (o.lane - 1) * 3);
       const touching = o.type === 'train' ? o.z > -4.6 && o.z < 4.7 : Math.abs(o.z) < .8;
       if (!o.taken && touching && deltaX < 1.03) {
-        if (o.type === 'coin') {
+        if (o.type === 'jetpack') {
+          o.taken = true;
+          this.jetpack = 10;
+          this.jump = this.slide = 0;
+          this.emit('jetpack');
+        } else if (o.type === 'coin') {
           o.taken = true;
           this.coins++;
           this.combo++;
@@ -101,7 +121,7 @@ export class RunnerGame {
           }
         } else {
           const collision = o.type === 'train' || (o.type === 'box' ? this.y < 1.28 : this.slide <= 0);
-          if (collision) {
+          if (collision && !flying && this.jetpack <= 0 && this.landing <= 0) {
             if (this.power > 0) {
               o.taken = true;
               this.emit('smash', { item: o });
@@ -114,7 +134,7 @@ export class RunnerGame {
         }
       }
       const end = o.type === 'train' ? 4.8 : .9;
-      if (o.type !== 'coin' && !o.taken && !o.passed && o.z > end) {
+      if (o.type !== 'coin' && o.type !== 'jetpack' && !flying && this.landing <= 0 && !o.taken && !o.passed && o.z > end) {
         o.passed = true;
         if (deltaX < 3.25 && !this.dodgeCooldown) {
           this.dodgeCooldown = 2.2;

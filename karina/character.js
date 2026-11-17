@@ -1,4 +1,5 @@
 import * as T from './three.module.js';
+import { makeJetpack } from './flight.js?v=flight-4';
 
 // A paper puppet rig over the supplied photograph. The original face remains the
 // base texture; independent eyes, brows and a hinged lower jaw animate at 9 fps.
@@ -162,6 +163,9 @@ export function createKarina(texture, materials, skin) {
   aura.scale.set(1.1, 1.8, 1.0);
   aura.position.y = 1.8;
   group.add(aura);
+  const pack = makeJetpack();
+  pack.group.position.set(0, 1.6, -.57);
+  torso.add(pack.group);
   const moods = {
     neutral: { eye: .84, brow: 0, mouth: .03 },
     smug: { eye: .57, brow: -.18, mouth: .07 },
@@ -174,7 +178,9 @@ export function createKarina(texture, materials, skin) {
   let lastTick = -1;
   return {
     group, head,
-    update(time, dt, { playing, mood = 'neutral', speaking = false, reaction = false, meme = false, jump = 0, slide = false, power = false, lean = 0, menu = false }) {
+    update(time, dt, { playing, mood = 'neutral', speaking = false, reaction = false, meme = false, flying = false, orbit = false, jump = 0, slide = false, power = false, lean = 0, menu = false }) {
+      pack.group.visible = flying;
+      pack.update(time, flying, orbit);
       const tick = Math.floor(time * 9);
       const stepTime = tick / 9;
       const desiredTurn = menu ? .08 : reaction ? 0 : Math.PI;
@@ -214,7 +220,12 @@ export function createKarina(texture, materials, skin) {
         leg.rotation.x = jump ? -.35 * side : run;
         arm.rotation.x = -run;
         arm.rotation.z = power ? side * -.45 : menu && side === -1 ? -.15 : 0;
-        if (meme) {
+        if (flying) {
+          arm.rotation.x = -.55;
+          arm.rotation.z = side * .45;
+          leg.rotation.x = .25;
+        }
+        if (meme && !flying) {
           const alternate = Math.sin(Math.floor(time * 9) / 9 * 7) * side;
           arm.rotation.x = -1.35 + alternate * .35;
           arm.rotation.z = side * (.85 + alternate * .3);

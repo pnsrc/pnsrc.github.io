@@ -1,12 +1,15 @@
 import * as T from './three.module.js';
 import { RunnerGame } from './runner.js';
-import { createKarina } from './character.js?v=maria-3';
-import { SKINS, findSkin } from './skins.js?v=maria-3';
+import { createKarina } from './character.js?v=flight-4';
+import { SKINS, findSkin } from './skins.js?v=flight-4';
+import { VoiceBank } from './voice-bank.js?v=flight-4';
+import { makeJetpack, OrbitMeme } from './flight.js?v=flight-4';
 
 const $ = id => document.getElementById(id);
 const root = $('game');
 const canvas = $('c');
 const sim = new RunnerGame();
+const orbit = new OrbitMeme(root, $('orbit-overlay'));
 let renderer;
 try {
   renderer = new T.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -261,7 +264,11 @@ for (const side of [-1, 1]) {
 const itemMeshes = new Map();
 function createItem(item) {
   const g = new T.Group();
-  if (item.type === 'coin') {
+  if (item.type === 'jetpack') {
+    const pack = makeJetpack(); pack.group.position.y = 1.4; pack.update(0, false); g.add(pack.group);
+    const glow = new T.Mesh(new T.TorusGeometry(.64, .045, 8, 32), new T.MeshBasicMaterial({ color: '#dcff65' }));
+    glow.position.y = 1.4; g.add(glow);
+  } else if (item.type === 'coin') {
     box(.43, .72, .14, '#f7543d', 0, 1.23, 0, g);
     sign('辣条', .40, .45, 0, 1.24, .076, g, '#ed4937');
     box(.44, .055, .16, '#ffd67c', 0, 1.60, 0, g);
@@ -298,7 +305,8 @@ function syncItems(time) {
   for (const item of sim.items) {
     alive.add(item.id);
     const mesh = itemMeshes.get(item.id) || createItem(item);
-    mesh.position.set((item.lane - 1) * 3, item.type === 'coin' ? Math.sin(time * 3 + item.id) * .12 : 0, item.z);
+    mesh.position.set((item.lane - 1) * 3, item.type === 'coin' ? (item.altitude || 0) + Math.sin(time * 3 + item.id) * .12 : item.type === 'jetpack' ? Math.sin(time * 3) * .2 : 0, item.z);
+    if (item.type === 'jetpack') mesh.rotation.y = Math.sin(time * 2) * .4;
     if (item.type === 'coin') { mesh.rotation.y = Math.sin(time * 2 + item.id) * .4; mesh.rotation.z = Math.sin(time * 4 + item.id) * .10; }
   }
   for (const [id, mesh] of itemMeshes) {
@@ -332,9 +340,10 @@ let best = 0, soundOn = true;
 try { best = +localStorage.getItem('karina-best') || 0; soundOn = localStorage.getItem('karina-sound') !== 'off'; } catch {}
 $('best').textContent = best;
 let audio;
+const voices = new VoiceBank(() => audio, () => soundOn);
 function initAudio() {
   if (!soundOn) return;
-  try { audio ??= new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); } catch {}
+  try { audio ??= new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); voices.warm(selectedSkin.id); } catch {}
 }
 function tone(frequency, duration = .09, type = 'sine', volume = .04, at = 0, end = frequency) {
   if (!soundOn || !audio || audio.state !== 'running') return;
@@ -357,29 +366,18 @@ function updateSoundButton() { $('sound').classList.toggle('muted', !soundOn); $
 function toggleSound() { soundOn = !soundOn; if (!soundOn) stopVoice(); try { localStorage.setItem('karina-sound', soundOn ? 'on' : 'off'); } catch {} initAudio(); updateSoundButton(); }
 updateSoundButton();
 
-const phrases = {
-  start: ['Я быстро. Только за латяо.', 'Дела? Не, не слышала.', 'Дедлайн сам себя перенесёт.'],
-  coin: ['Это на подумать.', 'Хрум. Решение принято.', 'Один латяо — одна отмазка.', 'Пачку в руки — и никаких созвонов.'],
-  combo: ['Я не торможу. Я жую.', 'Это уже не перекус. Это стратегия.'],
-  jump: ['Дела? Через них!', 'Я выше этих проблем.', 'Не трогай, это паркур.'],
-  slide: ['Ушла от ответа.', 'На пять минут? Я пас.', 'Мой уровень вовлечённости.'],
-  dodge: ['Я так и планировала.', 'А можно без резких дедлайнов?', 'В миллиметре от продуктивности.'],
-  power: ['ОЙ. ОНО ОСТРОЕ.', 'МНЕ ТЕПЕРЬ ВСЁ МОЖНО.'],
-  smash: ['Правки отменяются!', 'А это уже ваши проблемы.', 'Созвон перенесён. Мной.'],
-  powerEnd: ['Ладно. Вернёмся к панике.', 'Острота прошла. Дела остались.'],
-  hit: ['Я думала, это на завтра.', 'Можно я просто доем?', 'Ой. А я ещё не начинала.', 'Это не провал. Это черновик.'],
-  milestone: ['Всё. Перенесла на завтра.', 'Ответила мысленно. Считается.']
-};
-function pick(key) { const list = selectedSkin.lines?.[key] || phrases[key]; return list[Math.floor(Math.random() * list.length)]; }
+function pick(key) { return voices.pick(selectedSkin.id, key); }
 let mood = 'smug', moodUntil = 0, speakingUntil = 0, bubbleUntil = 0, reactionUntil = 0, reactionPriority = 0;
 let clock = 0, slowUntil = 0, shakeUntil = 0, lastCoinLine = -10, lastActionLine = -10, playedSeconds = 0;
 let currentComicTimer = 0, milestoneTimer = 0, flameTimer = 0;
 let gestureUntil = 0, mogCooldownUntil = 0;
 function react(line, emotion, duration = 2.3, priority = 1) {
   if (clock < bubbleUntil && priority < reactionPriority) return;
+  const clip = voices.clip(selectedSkin.id, line);
+  duration = Math.max(duration, Math.min(4.5, (clip?.duration || 0) + .3));
   reactionPriority = priority;
   mood = emotion; moodUntil = clock + duration;
-  speakingUntil = clock + Math.min(1.5, duration * .65);
+  speakingUntil = clock + (clip?.duration || Math.min(1.5, duration * .65));
   reactionUntil = clock + duration;
   bubbleUntil = clock + duration;
   $('reaction-text').textContent = line;
@@ -387,7 +385,7 @@ function react(line, emotion, duration = 2.3, priority = 1) {
   $('reaction').style.animation = 'none';
   void $('reaction').offsetWidth;
   $('reaction').style.animation = '';
-  sound('talk');
+  if (clip) voices.speak(selectedSkin.id, line); else sound('talk');
 }
 function comic(text, color = '#dcff65') {
   $('comic').textContent = text; $('comic').style.color = color;
@@ -400,18 +398,7 @@ function milestone(small, big) {
   milestoneTimer = clock + 2.6;
 }
 function flash(name) { $('impact').className = `impact ${name}`; void $('impact').offsetWidth; }
-function stopVoice() {
-  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-}
-function sayMaria(text) {
-  if (!soundOn || !('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return;
-  stopVoice();
-  const speech = new SpeechSynthesisUtterance(text);
-  speech.lang = 'ru-RU'; speech.rate = 1.18; speech.pitch = 1.35; speech.volume = .85;
-  const russian = window.speechSynthesis.getVoices().find(voice => voice.lang.toLowerCase().startsWith('ru'));
-  if (russian) speech.voice = russian;
-  window.speechSynthesis.speak(speech);
-}
+function stopVoice() { voices.stop(); }
 function mariaShout({ force = false, checkpoint = 0 } = {}) {
   if (selectedSkin.special !== '67' || sim.mode === 'paused') return;
   if (!force && clock < mogCooldownUntil) return;
@@ -421,9 +408,9 @@ function mariaShout({ force = false, checkpoint = 0 } = {}) {
   comic(checkpoint ? '6 7' : 'МОГНУЛА.', '#ffd798');
   if (checkpoint) milestone(`${checkpoint} МЕТРОВ · МАРИЯ ОДОБРЯЕТ`, '6… 7!');
   burst(karina.group.position.x, 3.5 + karina.group.position.y, .5, '#ffd798', 18, 1.2);
-  sayMaria(checkpoint ? 'Сикс! Севен!' : 'Я тебя могну!');
 }
 function resetEffects() {
+  orbit.finish();
   stopVoice();
   gestureUntil = mogCooldownUntil = 0;
   $('reaction').hidden = true; $('comic').classList.remove('show'); $('milestone').classList.remove('show');
@@ -442,13 +429,13 @@ function start() {
   $('controls-hint').style.opacity = '1';
   canvas.focus({ preventScroll: true });
 }
-function showMenu(mode) {
+function showMenu(mode, defeatLine = null) {
   const paused = mode === 'paused';
   root.dataset.mode = mode;
   const menu = $('menu'); menu.className = `menu ${paused ? 'paused' : 'over'}`; menu.hidden = false;
   $('eyebrow').textContent = paused ? 'ДЕДЛАЙН ТОЖЕ НА ПАУЗЕ' : 'ЭТО БЫЛА РАЗМИНКА';
   $('title').innerHTML = paused ? 'ПЕРЕКУР.<span>В СМЫСЛЕ,<br>ПЕРЕКУС.</span>' : 'НУ ВСЁ.<span>ПОРА ДЕЛАТЬ<br>ВИД, ЧТО РАБОТАЕШЬ.</span>';
-  $('description').textContent = paused ? 'Можно выдохнуть. И ещё раз хрумкнуть.' : pick('hit');
+  $('description').textContent = paused ? 'Можно выдохнуть. И ещё раз хрумкнуть.' : defeatLine || pick('hit');
   $('start-label').textContent = paused ? 'ПРОДОЛЖИТЬ' : 'ЕЩЁ ПО ЗАКУСОЧКЕ';
   $('results').hidden = paused;
   $('result-distance').textContent = Math.floor(sim.distance);
@@ -471,6 +458,14 @@ function handleEvents(events) {
     switch (event.type) {
       case 'start':
         react(pick('start'), 'smug', 2.1, 2); break;
+      case 'jetpack':
+        sound('power');
+        beginOrbit();
+        break;
+      case 'jetpack-end':
+        react(pick('land'), 'panic', 2.5, 3);
+        burst(sim.x, .2, 0, '#d5c9b3', 15, .8);
+        break;
       case 'coin':
         sound('coin');
         burst(sim.x, 1.6 + sim.y, .1, '#edff7a', 6, .5);
@@ -515,19 +510,28 @@ function handleEvents(events) {
       case 'hit':
         sound('hit'); flash('hit'); shakeUntil = clock + .5;
         burst(sim.x, 2.8, .2, '#fff0ca', 18, 1.3);
+        const defeatLine = pick('hit'); voices.speak(selectedSkin.id, defeatLine);
         mood = 'dead'; moodUntil = clock + 100;
         bubbleUntil = clock; $('reaction').hidden = true;
         comic('ОЙ.', '#ff8b70');
-        showMenu('over'); break;
+        showMenu('over', defeatLine); break;
     }
   }
 }
 
+function beginOrbit() {
+  initAudio();
+  orbit.begin(karina.group, selectedSkin.name);
+  react(pick('orbit'), 'panic', 4.2, 8);
+}
 function updateUI() {
   const maria = selectedSkin.special === '67';
   $('mog').hidden = !maria;
   $('mog').disabled = sim.mode === 'paused' || clock < mogCooldownUntil;
   $('mog').textContent = clock < mogCooldownUntil ? String(Math.ceil(mogCooldownUntil - clock)) : '67';
+  $('flight-hud').hidden = sim.jetpack <= 0;
+  $('flight-fill').style.width = `${sim.jetpack * 10}%`;
+  $('flight-seconds').textContent = Math.ceil(sim.jetpack);
   $('distance').textContent = Math.floor(sim.distance);
   $('coins').textContent = sim.coins;
   $('heat').classList.toggle('hot', sim.power > 0);
@@ -548,9 +552,15 @@ $('start').onclick = () => sim.mode === 'paused' ? pause() : start();
 $('pause').onclick = pause;
 $('sound').onclick = toggleSound;
 $('mog').onclick = () => { initAudio(); mariaShout(); };
+$('preview-flight').onclick = beginOrbit;
+$('orbit-close').onclick = () => orbit.finish();
 const keys = { ArrowLeft: 'left', a: 'left', A: 'left', 'ф': 'left', ArrowRight: 'right', d: 'right', D: 'right', 'в': 'right', ArrowUp: 'jump', ' ': 'jump', w: 'jump', W: 'jump', 'ц': 'jump', ArrowDown: 'slide', s: 'slide', S: 'slide', 'ы': 'slide' };
 addEventListener('keydown', e => {
   if (e.target instanceof HTMLButtonElement && (e.key === ' ' || e.key === 'Enter')) return;
+  if (orbit.active) {
+    if (e.key === 'Escape') orbit.finish();
+    return;
+  }
   if (keys[e.key]) { e.preventDefault(); if (!e.repeat || ['left', 'right'].includes(keys[e.key])) sim.action(keys[e.key]); }
   if (['p', 'P', 'з', 'Escape'].includes(e.key) && !e.repeat) pause();
   if (['m', 'M', 'ь'].includes(e.key) && !e.repeat) toggleSound();
@@ -586,7 +596,7 @@ function animate(now) {
   const paused = sim.mode === 'paused';
   if (!paused) { time += dt; clock += dt; }
   const wasPlaying = sim.mode === 'play';
-  if (wasPlaying) {
+  if (wasPlaying && !orbit.active) {
     playedSeconds += dt;
     const delta = dt * (clock < slowUntil ? .38 : 1);
     const previousDistance = sim.distance;
@@ -610,14 +620,14 @@ function animate(now) {
     karina.group.position.y = Math.sin(Math.floor(time * 9) / 9 * 2) * .02;
   } else {
     karina.group.position.x = sim.x;
-    karina.group.position.y = sim.y;
+    karina.group.position.y += (sim.y - karina.group.position.y) * Math.min(1, dt * 10);
   }
   const reaction = clock < reactionUntil;
   let expression = clock < moodUntil ? mood : sim.power > 0 ? 'spicy' : 'neutral';
   if (sim.mode === 'ready' && clock >= moodUntil) expression = Math.floor(time / 4) % 2 ? 'smug' : 'happy';
   karina.update(time, paused ? 0 : dt, {
-    playing: wasPlaying && !paused, mood: expression, speaking: clock < speakingUntil,
-    reaction, meme: selectedSkin.special === '67' && clock < gestureUntil, jump: sim.jump, slide: sim.slide > 0 && !menu, power: sim.power > 0 && !menu, lean: menu ? 0 : sim.lean, menu
+    playing: wasPlaying && !paused && !orbit.active, mood: expression, speaking: clock < speakingUntil,
+    reaction, flying: sim.jetpack > 0 || orbit.active, orbit: orbit.active, meme: selectedSkin.special === '67' && clock < gestureUntil, jump: sim.jump, slide: sim.slide > 0 && !menu, power: sim.power > 0 && !menu, lean: menu ? 0 : sim.lean, menu: menu || orbit.active
   });
   deadline.visible = sim.mode !== 'ready';
   deadline.position.set(sim.x * .7 + Math.sin(time * 3) * .15, Math.abs(Math.sin(time * 7)) * .12, menu ? 2.6 : 5.2);
@@ -627,8 +637,8 @@ function animate(now) {
     if (W < 650) { cameraTarget.set(3.0, 3.2, 8.2); lookTarget.set(.7, .5, 0); }
     else { cameraTarget.set(3.7, 3.25, 7.1); lookTarget.set(-.9, 1.9, 0); }
   } else {
-    cameraTarget.set(sim.x * .30, 4.8 + (sim.power > 0 ? .2 : 0), 9.2);
-    lookTarget.set(sim.x * .15, 1.25, -11);
+    cameraTarget.set(sim.x * .30, (sim.jetpack > 0 ? 8.5 : 4.8) + (sim.power > 0 ? .2 : 0), 9.2);
+    lookTarget.set(sim.x * .15, sim.jetpack > 0 ? 4.5 : 1.25, -11);
   }
   camera.position.lerp(cameraTarget, Math.min(1, dt * 4));
   if (clock < shakeUntil) { camera.position.x += (Math.random() - .5) * .18; camera.position.y += (Math.random() - .5) * .12; }
@@ -646,7 +656,8 @@ function animate(now) {
     $('reaction').style.left = `${Math.min(W - (W < 650 ? 120 : 155), Math.max(W < 650 ? 120 : 155, x + (W < 650 ? 0 : 80)))}px`;
     $('reaction').style.top = `${Math.min(H - 120, Math.max(195, y))}px`;
   }
-  renderer.render(scene, camera);
+  if (orbit.active) orbit.render(renderer, time, paused ? 0 : dt, W, H);
+  else renderer.render(scene, camera);
   frameId = requestAnimationFrame(animate);
 }
 camera.position.set(W < 650 ? 3 : 3.7, 3.25, W < 650 ? 8.2 : 7.1);

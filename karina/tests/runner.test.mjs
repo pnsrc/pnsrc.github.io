@@ -27,8 +27,23 @@ test('power expiration restores ordinary collisions', () => {
 });
 test('every generated row leaves a snack lane free of obstacles', () => {
   const g = game(); g.distance = 1000;
-  for(let i = 0; i < 50; i++) { g.items = []; g.random = Math.random; g.row(); const snacks = g.items.filter(o => o.type === 'coin'); const blocks = g.items.filter(o => o.type !== 'coin'); assert.equal(snacks.length, 5); assert.ok(snacks.every(c => blocks.every(b => b.lane !== c.lane))); }
+  for(let i = 0; i < 50; i++) { g.items = []; g.random = Math.random; g.row(); const snacks = g.items.filter(o => o.type === 'coin'); const blocks = g.items.filter(o => !['coin', 'jetpack'].includes(o.type)); assert.equal(snacks.length, 5); assert.ok(snacks.every(c => blocks.every(b => b.lane !== c.lane))); }
 });
 test('restart clears the previous run and its reaction queue', () => {
   const g = game(); g.power = 4; g.coins = 100; g.mode = 'over'; g.emit('hit'); g.start(); assert.equal(g.power, 0); assert.equal(g.coins, 0); assert.equal(g.mode, 'play'); assert.deepEqual(g.drain().map(e => e.type), ['start']);
+});
+
+test('rocket pickup grants flight; a train underneath cannot end the run', () => {
+  const g = game(); g.add(1, -1, 'jetpack');
+  const events = step(g, .1); assert.ok(events.some(e => e.type === 'jetpack')); assert.ok(g.jetpack > 9);
+  g.add(1, -4, 'train'); step(g, .1); assert.equal(g.mode, 'play'); assert.ok(g.y > 3);
+});
+test('flight timer freezes on pause and resets on a new run', () => {
+  const g = game(); g.jetpack = 5; g.pause(); step(g, 2); assert.equal(g.jetpack, 5); g.start(); assert.equal(g.jetpack, 0);
+});
+test('flight spawns elevated snacks and gives a safe landing interval', () => {
+  const g = game(); g.jetpack = 4; g.row(); assert.ok(g.items.every(o => o.type === 'coin' && o.altitude > 3));
+  g.items = []; g.jetpack = .03; const events = step(g, .1); assert.ok(events.some(e => e.type === 'jetpack-end'));
+  g.add(1, -1, 'box'); step(g, .1); assert.equal(g.mode, 'play');
+  step(g, 1.2); g.add(1, -1, 'box'); step(g, .1); assert.equal(g.mode, 'over');
 });
