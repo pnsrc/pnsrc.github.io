@@ -1,6 +1,7 @@
 import * as T from './three.module.js';
 import { RunnerGame } from './runner.js';
-import { createKarina } from './character.js';
+import { createKarina } from './character.js?v=skins-2';
+import { SKINS, findSkin } from './skins.js';
 
 const $ = id => document.getElementById(id);
 const root = $('game');
@@ -143,17 +144,74 @@ for (let i = 0; i < 11; i++) {
 }
 ball(7, '#ffdcb1', -25, 32, -115, scene, [1, 1, 1], .7);
 
-const faceTexture = new T.TextureLoader().load('karina-face.png', () => { assetsReady = true; }, undefined, () => {
-  $('load-error').hidden = false;
-  $('load-error').querySelector('p').textContent = 'Не удалось загрузить лицо Карины. Обнови страницу.';
-});
-faceTexture.colorSpace = T.SRGBColorSpace;
-let assetsReady = false;
-const karina = createKarina(faceTexture, {
-  jacket: mat('#171e29'), seam: mat('#303d47'), zip: mat('#a7a69e'),
-  skin: mat('#e8b59a'), hair: mat('#54372f'), jeans: mat('#829ab2'), shoes: mat('#f0e9d9')
-});
-scene.add(karina.group);
+// Each skin owns a texture and a rig; switching never changes the current run.
+const rigs = new Map();
+const skinLoadState = new Map();
+let selectedSkin = SKINS[0];
+try { selectedSkin = findSkin(localStorage.getItem('karina-skin')); } catch {}
+let karina;
+const textureLoader = new T.TextureLoader();
+for (const skin of SKINS) {
+  const state = { ready: false, error: false };
+  skinLoadState.set(skin.id, state);
+  const texture = textureLoader.load(skin.texture, () => {
+    state.ready = true;
+    syncSkinReadiness();
+  }, undefined, () => {
+    state.error = true;
+    syncSkinReadiness();
+  });
+  texture.colorSpace = T.SRGBColorSpace;
+  const materials = Object.fromEntries(Object.entries(skin.colors).map(([key, color]) => [key, mat(color)]));
+  const rig = createKarina(texture, materials, skin);
+  rig.group.visible = skin.id === selectedSkin.id;
+  scene.add(rig.group);
+  rigs.set(skin.id, rig);
+}
+karina = rigs.get(selectedSkin.id);
+
+function syncSkinReadiness() {
+  const state = skinLoadState.get(selectedSkin.id);
+  const ready = !!state?.ready;
+  $('start').disabled = !ready;
+  $('start-label').textContent = ready
+    ? sim.mode === 'paused' ? 'ПРОДОЛЖИТЬ' : sim.mode === 'over' ? 'ЕЩЁ ПО ЗАКУСОЧКЕ' : 'ПОГНАЛИ'
+    : state?.error ? 'СКИН НЕДОСТУПЕН' : 'ЗАГРУЖАЮ СКИН…';
+  $('skin-status').hidden = ready;
+  $('skin-status').textContent = state?.error
+    ? 'Скин не загрузился. Выбери другой или обнови страницу.'
+    : 'Секунду, Карина переодевается…';
+  document.querySelectorAll('[data-skin]').forEach(button => {
+    button.setAttribute('aria-busy', String(!skinLoadState.get(button.dataset.skin)?.ready));
+  });
+}
+function selectSkin(id, persist = true) {
+  if (sim.mode !== 'ready' && sim.mode !== 'over') return;
+  const previous = karina;
+  selectedSkin = findSkin(id);
+  karina = rigs.get(selectedSkin.id);
+  if (previous !== karina) {
+    karina.group.position.copy(previous.group.position);
+    karina.group.rotation.copy(previous.group.rotation);
+  }
+  for (const [rigId, rig] of rigs) rig.group.visible = rigId === selectedSkin.id;
+  root.dataset.skin = selectedSkin.id;
+  document.querySelectorAll('[data-skin]').forEach(button => {
+    const selected = button.dataset.skin === selectedSkin.id;
+    button.classList.toggle('selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  });
+  $('reaction').querySelector('.speaker').textContent = selectedSkin.speaker;
+  if (sim.mode === 'ready') {
+    $('title').innerHTML = `${selectedSkin.name.toUpperCase()}<span>ДЕДЛАЙН<br>ПОДОЖДЁТ.</span>`;
+    $('eyebrow').textContent = selectedSkin.id === 'karina-2' ? 'ВТОРАЯ КАРИНА. ТОТ ЖЕ ДЕДЛАЙН.' : 'ЛАТЯО ЕСТЬ. ПЛАНА НЕТ.';
+    $('description').textContent = selectedSkin.description;
+  }
+  if (persist) {
+    try { localStorage.setItem('karina-skin', selectedSkin.id); } catch {}
+  }
+  syncSkinReadiness();
+}
 
 // Deadline is a literal angry alarm clock, complete with flailing paper arms.
 const deadline = new T.Group(); scene.add(deadline);
@@ -323,7 +381,7 @@ function resetEffects() {
   particles.length = 0;
 }
 function start() {
-  if (!assetsReady) return;
+  if (!skinLoadState.get(selectedSkin.id)?.ready) return;
   initAudio(); resetEffects(); sim.start();
   playedSeconds = 0;
   root.dataset.mode = 'play'; $('menu').hidden = true;
@@ -424,6 +482,10 @@ function updateUI() {
   $('controls-hint').style.opacity = playedSeconds > 9 ? '0' : '1';
 }
 
+document.querySelectorAll('[data-skin]').forEach(button => {
+  button.onclick = () => { selectSkin(button.dataset.skin); initAudio(); tone(480, .07, 'triangle', .025, 0, 680); };
+});
+selectSkin(selectedSkin.id, false);
 $('start').onclick = () => sim.mode === 'paused' ? pause() : start();
 $('pause').onclick = pause;
 $('sound').onclick = toggleSound;
