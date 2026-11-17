@@ -7,7 +7,7 @@
   <meta name="description" content="Карина, китайский латяо и очень настойчивый дедлайн. Трёхмерный раннер.">
   <title>Карина — дедлайн подождёт</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌶️</text></svg>">
-  <link rel="stylesheet" href="game.css?v=skins-2">
+  <link rel="stylesheet" href="game.css?v=maria-3">
 </head>
 <body>
 <main id="game" data-mode="ready" aria-label="Карина: побег от дедлайна">
@@ -23,6 +23,7 @@
     </div>
     <div class="hud-right">
       <div class="snacks" id="snacks" aria-label="Собрано латяо"><span aria-hidden="true">🌶</span><b id="coins">0</b></div>
+      <button class="icon-button mog-button" id="mog" aria-label="Я тебя могну! — E" title="Я тебя могну! — E" hidden>67</button>
       <button class="icon-button" id="sound" aria-label="Выключить звук" title="Звук — M"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Zm4 3c3 2 3 6 0 8m3-11c5 4 5 10 0 14"/></svg></button>
       <button class="icon-button" id="pause" aria-label="Пауза" title="Пауза — P"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg></button>
     </div>
@@ -35,12 +36,15 @@
       <h1 id="title">КАРИНА<span>ДЕДЛАЙН<br>ПОДОЖДЁТ.</span></h1>
       <p id="description">Пока все закрывают задачи,<br>она открывает пачку.</p>
       <div class="results" id="results" hidden><span><b id="result-distance">0</b> м</span><span>🌶 <b id="result-coins">0</b></span></div>
-      <div class="skin-picker" id="skin-picker" role="group" aria-label="Выбор скина">
+      <div class="skin-picker" id="skin-picker" role="group" aria-label="Выбор персонажа">
         <button class="skin-choice selected" data-skin="karina" aria-pressed="true" aria-label="Скин Карина, пуховик">
           <span class="skin-avatar"><img src="karina-face.png" alt="" width="42" height="42"></span><span>КАРИНА<small>ПУХОВИК</small></span><span class="skin-check" aria-hidden="true">✓</span>
         </button>
         <button class="skin-choice" data-skin="karina-2" aria-pressed="false" aria-label="Скин Карина вторая, очки и худи">
           <span class="skin-avatar"><img src="karina-2-face.png" alt="" width="42" height="42"></span><span>КАРИНА II<small>ОЧКИ И ХУДИ</small></span><span class="skin-check" aria-hidden="true">✓</span>
+        </button>
+        <button class="skin-choice" data-skin="maria" aria-pressed="false" aria-label="Персонаж Мария, 67 и я тебя могну">
+          <span class="skin-avatar"><img src="maria-face.png" alt="" width="42" height="42"></span><span>МАРИЯ<small>67 / МОГНУ</small></span><span class="skin-check" aria-hidden="true">✓</span>
         </button>
       </div>
       <span class="skin-status" id="skin-status" role="status" hidden></span>
@@ -57,6 +61,6 @@
   <div class="touch" aria-label="Управление"><div><button data-action="left" aria-label="Влево">←</button><button data-action="right" aria-label="Вправо">→</button></div><div><button data-action="slide" aria-label="Подкат">↓</button><button data-action="jump" aria-label="Прыжок">↑</button></div></div>
   <div class="load-error" id="load-error" hidden><b>Игра не запустилась</b><p>Обнови страницу в браузере с поддержкой WebGL.</p><button onclick="location.reload()">Попробовать ещё</button></div>
 </main>
-<script type="module" src="game.js?v=skins-2"></script>
+<script type="module" src="game.js?v=maria-3"></script>
 </body>
 </html>

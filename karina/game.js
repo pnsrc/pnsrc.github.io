@@ -1,7 +1,7 @@
 import * as T from './three.module.js';
 import { RunnerGame } from './runner.js';
-import { createKarina } from './character.js?v=skins-2';
-import { SKINS, findSkin } from './skins.js';
+import { createKarina } from './character.js?v=maria-3';
+import { SKINS, findSkin } from './skins.js?v=maria-3';
 
 const $ = id => document.getElementById(id);
 const root = $('game');
@@ -43,6 +43,28 @@ function mat(color, glow = 0) {
   const key = `${color}:${glow}`;
   if (!matCache.has(key)) matCache.set(key, new T.MeshStandardMaterial({ color, roughness: .8, emissive: color, emissiveIntensity: glow }));
   return matCache.get(key);
+}
+function plaidMaterial() {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 256;
+  const g = canvas.getContext('2d');
+  g.fillStyle = '#a59b8e'; g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 256; i += 4) {
+    g.fillStyle = i % 8 ? '#847f7333' : '#d1c5b544';
+    g.fillRect(i, 0, 1, 256); g.fillRect(0, i, 256, 1);
+  }
+  for (let i = 0; i < 256; i += 64) {
+    g.fillStyle = '#514b4399';
+    g.fillRect(i, 0, 3, 256); g.fillRect(i + 7, 0, 1, 256);
+    g.fillRect(0, i, 256, 3); g.fillRect(0, i + 7, 256, 1);
+    g.fillStyle = '#aa655970';
+    g.fillRect(i + 31, 0, 2, 256); g.fillRect(0, i + 31, 256, 2);
+  }
+  const texture = new T.CanvasTexture(canvas);
+  texture.colorSpace = T.SRGBColorSpace;
+  texture.wrapS = texture.wrapT = T.RepeatWrapping;
+  texture.repeat.set(2, 2);
+  return new T.MeshStandardMaterial({ map: texture, roughness: 1 });
 }
 function box(w, h, d, color, x = 0, y = 0, z = 0, parent = scene, glow = 0) {
   const object = new T.Mesh(boxGeo, mat(color, glow));
@@ -163,6 +185,7 @@ for (const skin of SKINS) {
   });
   texture.colorSpace = T.SRGBColorSpace;
   const materials = Object.fromEntries(Object.entries(skin.colors).map(([key, color]) => [key, mat(color)]));
+  if (skin.outfit === 'blazer') materials.jacket = plaidMaterial();
   const rig = createKarina(texture, materials, skin);
   rig.group.visible = skin.id === selectedSkin.id;
   scene.add(rig.group);
@@ -174,14 +197,15 @@ function syncSkinReadiness() {
   const state = skinLoadState.get(selectedSkin.id);
   const ready = !!state?.ready;
   $('start').disabled = !ready;
+  for (const [id, rig] of rigs) rig.group.visible = id === selectedSkin.id && ready;
   $('start-label').textContent = ready
     ? sim.mode === 'paused' ? 'ПРОДОЛЖИТЬ' : sim.mode === 'over' ? 'ЕЩЁ ПО ЗАКУСОЧКЕ' : 'ПОГНАЛИ'
     : state?.error ? 'СКИН НЕДОСТУПЕН' : 'ЗАГРУЖАЮ СКИН…';
   $('skin-status').hidden = ready;
   $('skin-status').textContent = state?.error
-    ? 'Скин не загрузился. Выбери другой или обнови страницу.'
-    : 'Секунду, Карина переодевается…';
-  document.querySelectorAll('[data-skin]').forEach(button => {
+    ? 'Персонаж не загрузился. Выбери другого или обнови страницу.'
+    : 'Секунду, персонаж переодевается…';
+  document.querySelectorAll('button[data-skin]').forEach(button => {
     button.setAttribute('aria-busy', String(!skinLoadState.get(button.dataset.skin)?.ready));
   });
 }
@@ -191,20 +215,23 @@ function selectSkin(id, persist = true) {
   selectedSkin = findSkin(id);
   karina = rigs.get(selectedSkin.id);
   if (previous !== karina) {
+    resetEffects();
     karina.group.position.copy(previous.group.position);
     karina.group.rotation.copy(previous.group.rotation);
   }
   for (const [rigId, rig] of rigs) rig.group.visible = rigId === selectedSkin.id;
   root.dataset.skin = selectedSkin.id;
-  document.querySelectorAll('[data-skin]').forEach(button => {
+  document.querySelectorAll('button[data-skin]').forEach(button => {
     const selected = button.dataset.skin === selectedSkin.id;
     button.classList.toggle('selected', selected);
     button.setAttribute('aria-pressed', String(selected));
   });
   $('reaction').querySelector('.speaker').textContent = selectedSkin.speaker;
+  $('mog').hidden = selectedSkin.special !== '67';
   if (sim.mode === 'ready') {
-    $('title').innerHTML = `${selectedSkin.name.toUpperCase()}<span>ДЕДЛАЙН<br>ПОДОЖДЁТ.</span>`;
-    $('eyebrow').textContent = selectedSkin.id === 'karina-2' ? 'ВТОРАЯ КАРИНА. ТОТ ЖЕ ДЕДЛАЙН.' : 'ЛАТЯО ЕСТЬ. ПЛАНА НЕТ.';
+    const headline = selectedSkin.headline || ['ДЕДЛАЙН', 'ПОДОЖДЁТ.'];
+    $('title').innerHTML = `${selectedSkin.name.toUpperCase()}<span>${headline.join('<br>')}</span>`;
+    $('eyebrow').textContent = selectedSkin.eyebrow || (selectedSkin.id === 'karina-2' ? 'ВТОРАЯ КАРИНА. ТОТ ЖЕ ДЕДЛАЙН.' : 'ЛАТЯО ЕСТЬ. ПЛАНА НЕТ.');
     $('description').textContent = selectedSkin.description;
   }
   if (persist) {
@@ -327,7 +354,7 @@ function sound(name) {
   if (name === 'talk') for (let i = 0; i < 5; i++) tone(180 + i % 2 * 75, .045, 'triangle', .015, i * .09, 140);
 }
 function updateSoundButton() { $('sound').classList.toggle('muted', !soundOn); $('sound').setAttribute('aria-label', soundOn ? 'Выключить звук' : 'Включить звук'); }
-function toggleSound() { soundOn = !soundOn; try { localStorage.setItem('karina-sound', soundOn ? 'on' : 'off'); } catch {} initAudio(); updateSoundButton(); }
+function toggleSound() { soundOn = !soundOn; if (!soundOn) stopVoice(); try { localStorage.setItem('karina-sound', soundOn ? 'on' : 'off'); } catch {} initAudio(); updateSoundButton(); }
 updateSoundButton();
 
 const phrases = {
@@ -343,10 +370,11 @@ const phrases = {
   hit: ['Я думала, это на завтра.', 'Можно я просто доем?', 'Ой. А я ещё не начинала.', 'Это не провал. Это черновик.'],
   milestone: ['Всё. Перенесла на завтра.', 'Ответила мысленно. Считается.']
 };
-function pick(key) { const list = phrases[key]; return list[Math.floor(Math.random() * list.length)]; }
+function pick(key) { const list = selectedSkin.lines?.[key] || phrases[key]; return list[Math.floor(Math.random() * list.length)]; }
 let mood = 'smug', moodUntil = 0, speakingUntil = 0, bubbleUntil = 0, reactionUntil = 0, reactionPriority = 0;
 let clock = 0, slowUntil = 0, shakeUntil = 0, lastCoinLine = -10, lastActionLine = -10, playedSeconds = 0;
 let currentComicTimer = 0, milestoneTimer = 0, flameTimer = 0;
+let gestureUntil = 0, mogCooldownUntil = 0;
 function react(line, emotion, duration = 2.3, priority = 1) {
   if (clock < bubbleUntil && priority < reactionPriority) return;
   reactionPriority = priority;
@@ -372,7 +400,32 @@ function milestone(small, big) {
   milestoneTimer = clock + 2.6;
 }
 function flash(name) { $('impact').className = `impact ${name}`; void $('impact').offsetWidth; }
+function stopVoice() {
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+}
+function sayMaria(text) {
+  if (!soundOn || !('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return;
+  stopVoice();
+  const speech = new SpeechSynthesisUtterance(text);
+  speech.lang = 'ru-RU'; speech.rate = 1.18; speech.pitch = 1.35; speech.volume = .85;
+  const russian = window.speechSynthesis.getVoices().find(voice => voice.lang.toLowerCase().startsWith('ru'));
+  if (russian) speech.voice = russian;
+  window.speechSynthesis.speak(speech);
+}
+function mariaShout({ force = false, checkpoint = 0 } = {}) {
+  if (selectedSkin.special !== '67' || sim.mode === 'paused') return;
+  if (!force && clock < mogCooldownUntil) return;
+  gestureUntil = clock + 2.3;
+  mogCooldownUntil = clock + 6.7;
+  react(checkpoint ? 'СИКС! СЕВЕН!' : 'Я ТЕБЯ МОГНУ!', checkpoint ? 'happy' : 'angry', 2.5, 5);
+  comic(checkpoint ? '6 7' : 'МОГНУЛА.', '#ffd798');
+  if (checkpoint) milestone(`${checkpoint} МЕТРОВ · МАРИЯ ОДОБРЯЕТ`, '6… 7!');
+  burst(karina.group.position.x, 3.5 + karina.group.position.y, .5, '#ffd798', 18, 1.2);
+  sayMaria(checkpoint ? 'Сикс! Севен!' : 'Я тебя могну!');
+}
 function resetEffects() {
+  stopVoice();
+  gestureUntil = mogCooldownUntil = 0;
   $('reaction').hidden = true; $('comic').classList.remove('show'); $('milestone').classList.remove('show');
   $('impact').className = 'impact';
   bubbleUntil = speakingUntil = reactionUntil = moodUntil = slowUntil = shakeUntil = 0;
@@ -408,7 +461,7 @@ function showMenu(mode) {
   }
 }
 function pause() {
-  if (sim.mode === 'play') { sim.pause(); showMenu('paused'); $('reaction').hidden = true; }
+  if (sim.mode === 'play') { stopVoice(); sim.pause(); showMenu('paused'); $('reaction').hidden = true; }
   else if (sim.mode === 'paused') {
     initAudio(); sim.resume(); root.dataset.mode = 'play'; $('menu').hidden = true; canvas.focus({ preventScroll: true });
   }
@@ -446,6 +499,7 @@ function handleEvents(events) {
         sound('power'); flash('collect');
         milestone('10 ЛАТЯО. НОЛЬ СТРАХА.', 'РЕЖИМ «ПОФИГ»');
         react(pick('power'), 'spicy', 3, 4);
+        if (selectedSkin.special === '67') mariaShout({ force: true });
         burst(sim.x, 1.4, 0, '#ff8b4d', 30, 1.6);
         break;
       case 'power-end':
@@ -470,6 +524,10 @@ function handleEvents(events) {
 }
 
 function updateUI() {
+  const maria = selectedSkin.special === '67';
+  $('mog').hidden = !maria;
+  $('mog').disabled = sim.mode === 'paused' || clock < mogCooldownUntil;
+  $('mog').textContent = clock < mogCooldownUntil ? String(Math.ceil(mogCooldownUntil - clock)) : '67';
   $('distance').textContent = Math.floor(sim.distance);
   $('coins').textContent = sim.coins;
   $('heat').classList.toggle('hot', sim.power > 0);
@@ -482,19 +540,21 @@ function updateUI() {
   $('controls-hint').style.opacity = playedSeconds > 9 ? '0' : '1';
 }
 
-document.querySelectorAll('[data-skin]').forEach(button => {
+document.querySelectorAll('button[data-skin]').forEach(button => {
   button.onclick = () => { selectSkin(button.dataset.skin); initAudio(); tone(480, .07, 'triangle', .025, 0, 680); };
 });
 selectSkin(selectedSkin.id, false);
 $('start').onclick = () => sim.mode === 'paused' ? pause() : start();
 $('pause').onclick = pause;
 $('sound').onclick = toggleSound;
+$('mog').onclick = () => { initAudio(); mariaShout(); };
 const keys = { ArrowLeft: 'left', a: 'left', A: 'left', 'ф': 'left', ArrowRight: 'right', d: 'right', D: 'right', 'в': 'right', ArrowUp: 'jump', ' ': 'jump', w: 'jump', W: 'jump', 'ц': 'jump', ArrowDown: 'slide', s: 'slide', S: 'slide', 'ы': 'slide' };
 addEventListener('keydown', e => {
   if (e.target instanceof HTMLButtonElement && (e.key === ' ' || e.key === 'Enter')) return;
   if (keys[e.key]) { e.preventDefault(); if (!e.repeat || ['left', 'right'].includes(keys[e.key])) sim.action(keys[e.key]); }
   if (['p', 'P', 'з', 'Escape'].includes(e.key) && !e.repeat) pause();
   if (['m', 'M', 'ь'].includes(e.key) && !e.repeat) toggleSound();
+  if (['e', 'E', 'у'].includes(e.key) && !e.repeat) { initAudio(); mariaShout(); }
   if (e.key === 'Enter' && (sim.mode === 'ready' || sim.mode === 'over')) start();
 });
 document.querySelectorAll('[data-action]').forEach(button => {
@@ -531,6 +591,9 @@ function animate(now) {
     const delta = dt * (clock < slowUntil ? .38 : 1);
     const previousDistance = sim.distance;
     handleEvents(sim.step(delta));
+    if (sim.mode === 'play' && selectedSkin.special === '67' && Math.floor(sim.distance / 67) > Math.floor(previousDistance / 67)) {
+      mariaShout({ force: true, checkpoint: Math.floor(sim.distance / 67) * 67 });
+    }
     const movement = sim.distance - previousDistance;
     trackPhase = (trackPhase + movement) % 2.6;
     for (const chunk of chunks) { chunk.position.z += movement; if (chunk.position.z > 24) chunk.position.z -= 132; }
@@ -551,10 +614,10 @@ function animate(now) {
   }
   const reaction = clock < reactionUntil;
   let expression = clock < moodUntil ? mood : sim.power > 0 ? 'spicy' : 'neutral';
-  if (sim.mode === 'ready') expression = Math.floor(time / 4) % 2 ? 'smug' : 'happy';
+  if (sim.mode === 'ready' && clock >= moodUntil) expression = Math.floor(time / 4) % 2 ? 'smug' : 'happy';
   karina.update(time, paused ? 0 : dt, {
     playing: wasPlaying && !paused, mood: expression, speaking: clock < speakingUntil,
-    reaction, jump: sim.jump, slide: sim.slide > 0 && !menu, power: sim.power > 0 && !menu, lean: menu ? 0 : sim.lean, menu
+    reaction, meme: selectedSkin.special === '67' && clock < gestureUntil, jump: sim.jump, slide: sim.slide > 0 && !menu, power: sim.power > 0 && !menu, lean: menu ? 0 : sim.lean, menu
   });
   deadline.visible = sim.mode !== 'ready';
   deadline.position.set(sim.x * .7 + Math.sin(time * 3) * .15, Math.abs(Math.sin(time * 7)) * .12, menu ? 2.6 : 5.2);

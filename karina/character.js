@@ -19,7 +19,7 @@ export function createKarina(texture, materials, skin) {
     if (scale) m.scale.set(...scale);
     return m;
   };
-  sphere(.62, materials.jacket, torso, 0, 1.52, 0, [1, 1.13, .7]);
+  sphere(.62, materials.jacket, torso, 0, 1.52, 0, [1, skin.outfit === 'blazer' ? 1.35 : 1.13, .7]);
   if (skin.outfit === 'puffer') for (let i = 0; i < 5; i++) {
     const ring = mesh(new T.TorusGeometry(.57, .027, 8, 32), materials.seam, torso, 0, 1.12 + i * .19, 0);
     ring.rotation.x = Math.PI / 2;
@@ -27,7 +27,7 @@ export function createKarina(texture, materials, skin) {
   }
   if (skin.outfit === 'puffer') {
     mesh(new T.BoxGeometry(.025, .97, .035), materials.zip, torso, 0, 1.53, .44);
-  } else {
+  } else if (skin.outfit === 'hoodie') {
     // Hoodie: a soft hood, front pocket and two loose drawstrings.
     const hood = mesh(new T.TorusGeometry(.28, .115, 10, 28), materials.seam, torso, 0, 2.05, -.12);
     hood.scale.set(1.4, 1.0, 1);
@@ -38,15 +38,34 @@ export function createKarina(texture, materials, skin) {
       sphere(.024, materials.zip, torso, side * .16, 1.65, .43);
     }
   }
+  if (skin.outfit === 'blazer') {
+    const shirt = new T.MeshStandardMaterial({ color: '#505344', roughness: 1 });
+    mesh(new T.PlaneGeometry(.49, .87), shirt, torso, 0, 1.78, .447);
+    // Pointed lapels keep the plaid jacket distinct from the other two outfits.
+    for (const side of [-1, 1]) {
+      const shape = new T.Shape();
+      shape.moveTo(side * .44, 2.13);
+      shape.lineTo(side * .20, 2.16);
+      shape.lineTo(side * .03, 1.27);
+      shape.lineTo(side * .40, 1.78);
+      shape.lineTo(side * .27, 1.91);
+      shape.closePath();
+      const lapel = mesh(new T.ExtrudeGeometry(shape, { depth: .023, bevelEnabled: false }), materials.jacket, torso, 0, 0, .46);
+      lapel.castShadow = false;
+      mesh(new T.BoxGeometry(.27, .035, .03), materials.seam, torso, side * .35, 1.18, .43);
+    }
+    sphere(.048, materials.seam, torso, .07, 1.17, .49, [1, 1, .35]);
+  }
   sphere(.16, materials.skin, torso, 0, 2.22, 0);
   const head = new T.Group();
   head.position.set(0, 2.85, 0);
   torso.add(head);
-  if (skin.outfit === 'hoodie') {
+  if (skin.outfit !== 'puffer') {
     sphere(.55, materials.hair, head, -.02, .01, .16, [.94, 1.13, .56]);
   } else {
     sphere(.55, materials.hair, head, .06, .01, -.08, [1.12, 1.2, .94]);
   }
+  if (skin.outfit === 'blazer') sphere(.22, materials.hair, head, 0, -.02, -.27, [1, 1, 1]);
   const photoGeo = new T.PlaneGeometry(1.52, 1.48, 32, 28);
   const vertices = photoGeo.attributes.position;
   for (let i = 0; i < vertices.count; i++) {
@@ -155,7 +174,7 @@ export function createKarina(texture, materials, skin) {
   let lastTick = -1;
   return {
     group, head,
-    update(time, dt, { playing, mood = 'neutral', speaking = false, reaction = false, jump = 0, slide = false, power = false, lean = 0, menu = false }) {
+    update(time, dt, { playing, mood = 'neutral', speaking = false, reaction = false, meme = false, jump = 0, slide = false, power = false, lean = 0, menu = false }) {
       const tick = Math.floor(time * 9);
       const stepTime = tick / 9;
       const desiredTurn = menu ? .08 : reaction ? 0 : Math.PI;
@@ -195,6 +214,11 @@ export function createKarina(texture, materials, skin) {
         leg.rotation.x = jump ? -.35 * side : run;
         arm.rotation.x = -run;
         arm.rotation.z = power ? side * -.45 : menu && side === -1 ? -.15 : 0;
+        if (meme) {
+          const alternate = Math.sin(Math.floor(time * 9) / 9 * 7) * side;
+          arm.rotation.x = -1.35 + alternate * .35;
+          arm.rotation.z = side * (.85 + alternate * .3);
+        }
       }
       group.rotation.z = lean;
       torso.scale.y += ((slide ? .43 : 1) - torso.scale.y) * Math.min(1, dt * 20);
