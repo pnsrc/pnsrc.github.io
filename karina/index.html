@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#102f38">
+  <meta name="description" content="Карина, китайский латяо и очень настойчивый дедлайн. Трёхмерный раннер.">
+  <title>Карина — дедлайн подождёт</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌶️</text></svg>">
+  <link rel="stylesheet" href="game.css">
+</head>
+<body>
+<main id="game" data-mode="ready" aria-label="Карина: побег от дедлайна">
+  <canvas id="c" aria-label="Трёхмерная игровая трасса" tabindex="0"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+  <div class="speed-lines" id="speed-lines" aria-hidden="true"></div>
+  <div class="impact" id="impact" aria-hidden="true"></div>
+
+  <div class="hud">
+    <div class="score" aria-label="Дистанция">
+      <span class="score-value" id="distance">0</span><span class="unit">м</span>
+      <span class="best">РЕКОРД <b id="best">0</b></span>
+    </div>
+    <div class="hud-right">
+      <div class="snacks" id="snacks" aria-label="Собрано латяо"><span aria-hidden="true">🌶</span><b id="coins">0</b></div>
+      <button class="icon-button" id="sound" aria-label="Выключить звук" title="Звук — M"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Zm4 3c3 2 3 6 0 8m3-11c5 4 5 10 0 14"/></svg></button>
+      <button class="icon-button" id="pause" aria-label="Пауза" title="Пауза — P"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg></button>
+    </div>
+  </div>
+  <div class="heat" id="heat"><div class="heat-track"><i id="heat-fill"></i></div><span id="heat-label">ЕЩЁ 10 ЛАТЯО ДО РЕЖИМА «ПОФИГ»</span></div>
+
+  <section class="menu intro" id="menu" aria-label="Меню игры">
+    <div class="menu-content">
+      <span class="eyebrow" id="eyebrow">ЛАТЯО ЕСТЬ. ПЛАНА НЕТ.</span>
+      <h1 id="title">КАРИНА<span>ДЕДЛАЙН<br>ПОДОЖДЁТ.</span></h1>
+      <p id="description">Пока все закрывают задачи,<br>она открывает пачку.</p>
+      <div class="results" id="results" hidden><span><b id="result-distance">0</b> м</span><span>🌶 <b id="result-coins">0</b></span></div>
+      <button id="start" class="play-button"><span id="start-label">ПОГНАЛИ</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+      <div class="menu-hint" id="menu-hint"><span>← → полосы</span><span>↑ прыжок</span><span>↓ подкат</span></div>
+      <span class="mobile-hint">Свайпай, чтобы выжить. Хрусти, чтобы жить.</span>
+    </div>
+  </section>
+
+  <div class="reaction" id="reaction" role="status" aria-live="polite" hidden><span class="speaker">КАРИНА</span><p id="reaction-text"></p></div>
+  <div class="comic" id="comic" aria-hidden="true"></div>
+  <div class="milestone" id="milestone" role="status"><small id="milestone-small"></small><strong id="milestone-big"></strong></div>
+  <div class="controls-hint" id="controls-hint"><kbd>←</kbd><kbd>→</kbd> смена полосы <span>·</span> <kbd>↑</kbd> прыжок <span>·</span> <kbd>↓</kbd> подкат</div>
+  <div class="touch" aria-label="Управление"><div><button data-action="left" aria-label="Влево">←</button><button data-action="right" aria-label="Вправо">→</button></div><div><button data-action="slide" aria-label="Подкат">↓</button><button data-action="jump" aria-label="Прыжок">↑</button></div></div>
+  <div class="load-error" id="load-error" hidden><b>Игра не запустилась</b><p>Обнови страницу в браузере с поддержкой WebGL.</p><button onclick="location.reload()">Попробовать ещё</button></div>
+</main>
+<script type="module" src="game.js"></script>
+</body>
+</html>
