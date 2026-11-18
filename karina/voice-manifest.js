@@ -120,6 +120,62 @@ export const DIALOGUE = {
         "src": "voices/karina/special-0.m4a",
         "duration": 2.105
       }
+    ],
+    "ability": [
+      {
+        "text": "Остро. Быстро. Безответственно!",
+        "src": "voices/karina/ability-0.m4a",
+        "duration": 2.3
+      }
+    ],
+    "magnet": [
+      {
+        "text": "Латяо, ко мне!",
+        "src": "voices/karina/magnet-0.m4a",
+        "duration": 1.203
+      }
+    ],
+    "shield": [
+      {
+        "text": "Моя последняя отмазка.",
+        "src": "voices/karina/shield-0.m4a",
+        "duration": 1.484
+      }
+    ],
+    "slow": [
+      {
+        "text": "Подождите. Я ещё жую.",
+        "src": "voices/karina/slow-0.m4a",
+        "duration": 1.746
+      }
+    ],
+    "slip": [
+      {
+        "text": "Это была запланированная лужа!",
+        "src": "voices/karina/slip-0.m4a",
+        "duration": 1.708
+      }
+    ],
+    "spring": [
+      {
+        "text": "Проблемы внизу. Я наверху!",
+        "src": "voices/karina/spring-0.m4a",
+        "duration": 1.752
+      }
+    ],
+    "mission": [
+      {
+        "text": "Задание? Я вообще-то отдыхала.",
+        "src": "voices/karina/mission-0.m4a",
+        "duration": 2.174
+      }
+    ],
+    "choice": [
+      {
+        "text": "Выбор сложный. Но я голодная.",
+        "src": "voices/karina/choice-0.m4a",
+        "duration": 2.092
+      }
     ]
   },
   "karina-2": {
@@ -241,6 +297,62 @@ export const DIALOGUE = {
         "text": "Мне всё видно. Делать я ничего не буду.",
         "src": "voices/karina-2/special-0.m4a",
         "duration": 2.649
+      }
+    ],
+    "ability": [
+      {
+        "text": "Мир, притормози. Я думаю.",
+        "src": "voices/karina-2/ability-0.m4a",
+        "duration": 2.239
+      }
+    ],
+    "magnet": [
+      {
+        "text": "Сила притяжения науки.",
+        "src": "voices/karina-2/magnet-0.m4a",
+        "duration": 1.524
+      }
+    ],
+    "shield": [
+      {
+        "text": "Защитила диплом. Теперь себя.",
+        "src": "voices/karina-2/shield-0.m4a",
+        "duration": 2.255
+      }
+    ],
+    "slow": [
+      {
+        "text": "Наконец-то мой темп работы.",
+        "src": "voices/karina-2/slow-0.m4a",
+        "duration": 1.721
+      }
+    ],
+    "slip": [
+      {
+        "text": "Трение подвело. Не я.",
+        "src": "voices/karina-2/slip-0.m4a",
+        "duration": 1.68
+      }
+    ],
+    "spring": [
+      {
+        "text": "Выше ожиданий. Снова.",
+        "src": "voices/karina-2/spring-0.m4a",
+        "duration": 1.787
+      }
+    ],
+    "mission": [
+      {
+        "text": "Зачёт автоматом. Я побежала.",
+        "src": "voices/karina-2/mission-0.m4a",
+        "duration": 2.336
+      }
+    ],
+    "choice": [
+      {
+        "text": "Риски оценены. Разум проигнорирован.",
+        "src": "voices/karina-2/choice-0.m4a",
+        "duration": 2.507
       }
     ]
   },
@@ -368,6 +480,62 @@ export const DIALOGUE = {
         "text": "СИКС! СЕВЕН!",
         "src": "voices/maria/special-1.m4a",
         "duration": 0.754
+      }
+    ],
+    "ability": [
+      {
+        "text": "Я тебя могну! Всех сразу!",
+        "src": "voices/maria/ability-0.m4a",
+        "duration": 1.753
+      }
+    ],
+    "magnet": [
+      {
+        "text": "Шесть, семь! Пачки, сюда!",
+        "src": "voices/maria/magnet-0.m4a",
+        "duration": 2.157
+      }
+    ],
+    "shield": [
+      {
+        "text": "Не пробьёшь! Я тебя могну!",
+        "src": "voices/maria/shield-0.m4a",
+        "duration": 1.696
+      }
+    ],
+    "slow": [
+      {
+        "text": "Шесть... семь... на минималках!",
+        "src": "voices/maria/slow-0.m4a",
+        "duration": 1.887
+      }
+    ],
+    "slip": [
+      {
+        "text": "Лужа меня могнула!",
+        "src": "voices/maria/slip-0.m4a",
+        "duration": 1.0
+      }
+    ],
+    "spring": [
+      {
+        "text": "Шесть, семь! Прыгнула в космос!",
+        "src": "voices/maria/spring-0.m4a",
+        "duration": 2.128
+      }
+    ],
+    "mission": [
+      {
+        "text": "Задание замогано!",
+        "src": "voices/maria/mission-0.m4a",
+        "duration": 1.029
+      }
+    ],
+    "choice": [
+      {
+        "text": "Щит или остро? Я выбираю хаос!",
+        "src": "voices/maria/choice-0.m4a",
+        "duration": 2.013
       }
     ]
   }

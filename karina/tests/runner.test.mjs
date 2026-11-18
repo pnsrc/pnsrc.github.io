@@ -25,9 +25,19 @@ test('ten snacks enable power; a train is smashed while powered', () => {
 test('power expiration restores ordinary collisions', () => {
   const g = game(); g.power = .03; step(g, .1); g.add(1, -1, 'train'); step(g, .1); assert.equal(g.mode, 'over');
 });
-test('every generated row leaves a snack lane free of obstacles', () => {
-  const g = game(); g.distance = 1000;
-  for(let i = 0; i < 50; i++) { g.items = []; g.random = Math.random; g.row(); const snacks = g.items.filter(o => o.type === 'coin'); const blocks = g.items.filter(o => !['coin', 'jetpack'].includes(o.type)); assert.equal(snacks.length, 5); assert.ok(snacks.every(c => blocks.every(b => b.lane !== c.lane))); }
+test('every route pattern leaves an escape lane, including the cart’s entire sweep', () => {
+  const g = game(); let seed = 3456;
+  g.random = () => ((seed = seed * 16807 % 2147483647) - 1) / 2147483646;
+  const seen = new Set();
+  for (let i = 0; i < 1000; i++) {
+    g.items = []; g.distance = i * 11; g.row();
+    const blocks = g.items.filter(o => ['box', 'bar', 'train', 'puddle', 'cart'].includes(o.type));
+    const free = [0, 1, 2].filter(lane => blocks.every(o => o.sweep ? !o.sweep.includes(lane) : o.lane !== lane));
+    assert.ok(free.length > 0, `no escape at ${g.distance}m`);
+    assert.ok(g.items.filter(o => o.type === 'coin').length >= 5);
+    g.items.forEach(o => seen.add(o.type));
+  }
+  for (const type of ['cart', 'puddle', 'spring', 'gate', 'slow', 'magnet', 'shield']) assert.ok(seen.has(type), type);
 });
 test('restart clears the previous run and its reaction queue', () => {
   const g = game(); g.power = 4; g.coins = 100; g.mode = 'over'; g.emit('hit'); g.start(); assert.equal(g.power, 0); assert.equal(g.coins, 0); assert.equal(g.mode, 'play'); assert.deepEqual(g.drain().map(e => e.type), ['start']);

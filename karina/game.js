@@ -1,10 +1,11 @@
 import * as T from './three.module.js';
-import { RunnerGame } from './runner.js';
+import { RunnerGame, ABILITIES } from './runner.js?v=chaos-1';
 import { createKarina } from './character.js?v=flight-4';
 import { SKINS, findSkin } from './skins.js?v=flight-4';
-import { VoiceBank } from './voice-bank.js?v=flight-4';
+import { VoiceBank } from './voice-bank.js?v=chaos-1';
 import { makeJetpack, OrbitMeme } from './flight.js?v=flight-4';
 import { OmskWorld } from './omsk-world.js?v=omsk-2';
+import { interactiveItem, GameplayEffects } from './interaction-visuals.js?v=chaos-1';
 
 const $ = id => document.getElementById(id);
 const root = $('game');
@@ -134,6 +135,7 @@ function updateSleepers() {
 updateSleepers();
 
 const city = new OmskWorld(scene, () => syncSkinReadiness());
+const gameplayEffects = new GameplayEffects(scene);
 ball(7, '#ffe2b0', -45, 52, -190, scene, [1, 1, 1], .7);
 
 // Each skin owns a texture and a rig; switching never changes the current run.
@@ -201,6 +203,8 @@ function selectSkin(id, persist = true) {
   });
   $('reaction').querySelector('.speaker').textContent = selectedSkin.speaker;
   $('mog').hidden = selectedSkin.special !== '67';
+  const ability = ABILITIES[selectedSkin.id];
+  $('ability-intro').textContent = `Q · ${ability.name.toLowerCase()} — ${ability.description.toLowerCase()}`;
   if (sim.mode === 'ready') {
     const headline = selectedSkin.headline || ['ДЕДЛАЙН', 'ПОДОЖДЁТ.'];
     $('title').innerHTML = `${selectedSkin.name.toUpperCase()}<span>${headline.join('<br>')}</span>`;
@@ -233,8 +237,11 @@ for (const side of [-1, 1]) {
 
 const itemMeshes = new Map();
 function createItem(item) {
-  const g = new T.Group();
-  if (item.type === 'jetpack') {
+  const interactive = interactiveItem(item, { box, ball, sign, mat });
+  const g = interactive || new T.Group();
+  if (interactive) {
+    // New interactive props share the same movement and lifetime as simulation items.
+  } else if (item.type === 'jetpack') {
     const pack = makeJetpack(); pack.group.position.y = 1.4; pack.update(0, false); g.add(pack.group);
     const glow = new T.Mesh(new T.TorusGeometry(.64, .045, 8, 32), new T.MeshBasicMaterial({ color: '#dcff65' }));
     glow.position.y = 1.4; g.add(glow);
@@ -275,7 +282,7 @@ function syncItems(time) {
   for (const item of sim.items) {
     alive.add(item.id);
     const mesh = itemMeshes.get(item.id) || createItem(item);
-    mesh.position.set((item.lane - 1) * 3, item.type === 'coin' ? (item.altitude || 0) + Math.sin(time * 3 + item.id) * .12 : item.type === 'jetpack' ? Math.sin(time * 3) * .2 : 0, item.z);
+    mesh.position.set(item.x ?? (item.lane - 1) * 3, item.type === 'coin' ? (item.altitude || 0) + Math.sin(time * 3 + item.id) * .12 : item.type === 'jetpack' || mesh.userData.float ? Math.sin(time * 3) * .2 : 0, item.z);
     if (item.type === 'jetpack') mesh.rotation.y = Math.sin(time * 2) * .4;
     if (item.type === 'coin') { mesh.rotation.y = Math.sin(time * 2 + item.id) * .4; mesh.rotation.z = Math.sin(time * 4 + item.id) * .10; }
   }
@@ -306,8 +313,8 @@ function animateParticles(dt) {
   }
 }
 
-let best = 0, soundOn = true;
-try { best = +localStorage.getItem('karina-best') || 0; soundOn = localStorage.getItem('karina-sound') !== 'off'; } catch {}
+let best = 0, bestScore = 0, soundOn = true;
+try { best = +localStorage.getItem('karina-best') || 0; bestScore = +localStorage.getItem('karina-best-score') || 0; soundOn = localStorage.getItem('karina-sound') !== 'off'; } catch {}
 $('best').textContent = best;
 let audio;
 const voices = new VoiceBank(() => audio, () => soundOn);
@@ -341,6 +348,7 @@ let mood = 'smug', moodUntil = 0, speakingUntil = 0, bubbleUntil = 0, reactionUn
 let clock = 0, slowUntil = 0, shakeUntil = 0, lastCoinLine = -10, lastActionLine = -10, playedSeconds = 0;
 let currentComicTimer = 0, milestoneTimer = 0, flameTimer = 0;
 let gestureUntil = 0, mogCooldownUntil = 0;
+let routeUntil = 0, buffKey = '', missionFocus = 0;
 function react(line, emotion, duration = 2.3, priority = 1) {
   if (clock < bubbleUntil && priority < reactionPriority) return;
   const clip = voices.clip(selectedSkin.id, line);
@@ -387,14 +395,16 @@ function resetEffects() {
   $('impact').className = 'impact';
   bubbleUntil = speakingUntil = reactionUntil = moodUntil = slowUntil = shakeUntil = 0;
   lastCoinLine = lastActionLine = clock - 10;
+  routeUntil = 0; missionFocus = 0; $('route-callout').hidden = true;
   for (const p of particles) scene.remove(p.mesh);
   particles.length = 0;
 }
 function start() {
   if (city.loading || !skinLoadState.get(selectedSkin.id)?.ready) return;
-  initAudio(); resetEffects(); sim.start();
+  initAudio(); resetEffects(); sim.start(selectedSkin.id);
   playedSeconds = 0;
   root.dataset.mode = 'play'; $('menu').hidden = true;
+  updateUI();
   $('pause').setAttribute('aria-label', 'Пауза');
   $('controls-hint').style.opacity = '1';
   canvas.focus({ preventScroll: true });
@@ -410,11 +420,14 @@ function showMenu(mode, defeatLine = null) {
   $('results').hidden = paused;
   $('result-distance').textContent = Math.floor(sim.distance);
   $('result-coins').textContent = sim.coins;
+  $('result-score').textContent = sim.score;
+  $('result-missions').textContent = `ЗАДАНИЯ ${sim.missionsDone}/3 · ЛУЧШИЕ ОЧКИ ${Math.max(bestScore, sim.score)}`;
   $('menu-hint').hidden = !paused;
   if (!paused) {
     best = Math.max(best, Math.floor(sim.distance));
+    bestScore = Math.max(bestScore, sim.score);
     $('best').textContent = best;
-    try { localStorage.setItem('karina-best', best); } catch {}
+    try { localStorage.setItem('karina-best', best); localStorage.setItem('karina-best-score', bestScore); } catch {}
   }
 }
 function pause() {
@@ -438,7 +451,7 @@ function handleEvents(events) {
         break;
       case 'coin':
         sound('coin');
-        burst(sim.x, 1.6 + sim.y, .1, '#edff7a', 6, .5);
+        burst(sim.x, 1.6 + sim.y, .1, event.magnet ? '#d8a4ff' : '#edff7a', 6, .5);
         $('snacks').classList.remove('pop'); void $('snacks').offsetWidth; $('snacks').classList.add('pop');
         if (event.combo % 5 === 0) {
           comic(`ХРУМ ×${event.combo}`);
@@ -457,8 +470,52 @@ function handleEvents(events) {
         break;
       case 'dodge':
         sound('dodge');
-        if (event.kind === 'near') { slowUntil = clock + .32; comic('ПРОНЕСЛО!'); react(pick('dodge'), 'panic', 1.8, 2); }
-        else { comic(event.kind === 'jump' ? 'НЕ СЕГОДНЯ!' : 'МЕНЯ ЗДЕСЬ НЕТ'); react(pick(event.kind), 'smug', 1.8, 2); }
+        if (event.kind === 'near') { slowUntil = clock + .25; comic(`ПРОНЕСЛО! +${event.points}`); react(pick('dodge'), 'panic', 1.8, 2); }
+        else { comic(`${event.kind === 'jump' ? 'ПЕРЕПРЫГНУЛА' : 'УСКОЛЬЗНУЛА'} ×${event.multiplier}`); react(pick(event.kind), 'smug', 1.8, 2); }
+        break;
+      case 'ability':
+        sound('power'); flash('collect');
+        gameplayEffects.wave(sim.x, event.character === 'maria' ? '#ffe2a0' : event.character === 'karina-2' ? '#c1b8ff' : '#ff976d');
+        if (event.character === 'maria') gestureUntil = clock + 2.3;
+        comic(ABILITIES[event.character].name, event.character === 'karina-2' ? '#c7baff' : '#ffd785');
+        react(pick('ability'), event.character === 'karina-2' ? 'smug' : 'angry', 2.5, 6);
+        break;
+      case 'boost':
+        sound('dodge'); flash('collect');
+        comic(event.kind === 'magnet' ? 'ЛАТЯО, КО МНЕ!' : event.kind === 'shield' ? '+1 ОТМАЗКА' : 'МИР, ПОМЕДЛЕННЕЕ', '#b5dfff');
+        react(pick(event.kind), 'happy', 2, 3);
+        break;
+      case 'shield-break':
+        sound('hit'); shakeUntil = clock + .18;
+        gameplayEffects.wave(sim.x, '#9cecf4'); burst(sim.x, 1.5, 0, '#a3e8ef', 30, 1.4);
+        comic('ЩИТ СПАС!'); react(pick('dodge'), 'panic', 2, 4);
+        break;
+      case 'spring':
+        sound('jump'); tone(280, .3, 'triangle', .05, 0, 1100);
+        comic('ПРОБЛЕМЫ ВНИЗУ!'); react(pick('spring'), 'happy', 2.3, 4);
+        burst(sim.x, .3, 0, '#dfff81', 25, 1.3);
+        break;
+      case 'slip':
+        sound('slide'); shakeUntil = clock + .25;
+        burst(sim.x, .15, 0, '#9dd9ed', 25, 1.2);
+        comic('ОЙ. СКОЛЬЗКО.', '#b5e4f1'); react(pick('slip'), 'panic', 2, 4);
+        break;
+      case 'choice':
+        sound('power');
+        comic(event.reward === 'shield' ? 'ВЫБРАЛА ОТМАЗКУ' : 'ВЫБРАЛА ХАОС ×2', event.reward === 'shield' ? '#b5e4f1' : '#ffbb7b');
+        react(pick('choice'), 'smug', 2.5, 3);
+        break;
+      case 'route':
+        $('route-callout').textContent = event.text;
+        $('route-callout').hidden = false; routeUntil = clock + 3.4;
+        break;
+      case 'mission':
+        sound('power'); milestone(`ЗАДАНИЕ ${event.completed}/3 · +${event.reward} ОЧКОВ`, event.title.toUpperCase());
+        react(pick('mission'), 'happy', 2.3, 4);
+        burst(sim.x, 3 + sim.y, 0, '#dfff85', 28, 1.3);
+        break;
+      case 'all-missions':
+        milestone('ТРИ ЗАДАНИЯ · +750 ОЧКОВ И ЩИТ', 'ОФИЦИАЛЬНО БЕЗДЕЛЬНИЦА');
         break;
       case 'power':
         sound('power'); flash('collect');
@@ -471,8 +528,9 @@ function handleEvents(events) {
         react(pick('powerEnd'), 'panic', 2.4, 3); break;
       case 'smash':
         sound('hit'); shakeUntil = clock + .18;
-        burst((event.item.lane - 1) * 3, 1.5, .2, '#ffc76e', 25, 1.6);
-        comic('БА-БАХ!', '#ffad68'); react(pick('smash'), 'angry', 1.8, 3); break;
+        burst(event.item.x ?? (event.item.lane - 1) * 3, 1.5, Math.max(-20, event.item.z), '#ffc76e', 25, 1.6);
+        if (!event.wave) { comic('БА-БАХ! +40', '#ffad68'); react(pick('smash'), 'angry', 1.8, 3); }
+        break;
       case 'milestone':
         milestone(`${event.distance} МЕТРОВ БЕЗ ЕДИНОЙ ЗАДАЧИ`, 'ДЕДЛАЙН ПЕРЕНЕСЁН');
         react(pick('milestone'), 'happy', 2.4, 2);
@@ -494,6 +552,10 @@ function beginOrbit() {
   orbit.begin(karina.group, selectedSkin.name);
   react(pick('orbit'), 'panic', 4.2, 8);
 }
+function activateAbility() {
+  if (orbit.active || sim.mode !== 'play') return;
+  initAudio(); sim.action('ability'); canvas.focus({ preventScroll: true });
+}
 function updateUI() {
   const maria = selectedSkin.special === '67';
   $('mog').hidden = !maria;
@@ -504,13 +566,36 @@ function updateUI() {
   $('flight-seconds').textContent = Math.ceil(sim.jetpack);
   $('distance').textContent = Math.floor(sim.distance);
   $('coins').textContent = sim.coins;
+  $('score').textContent = sim.score;
+  $('style-badge').hidden = sim.style <= 0;
+  $('style-badge').textContent = `СЕРИЯ ×${sim.multiplier}`;
+  $('style-badge').style.opacity = String(.45 + Math.min(1, sim.styleTimer / 2) * .55);
+  const ability = ABILITIES[selectedSkin.id];
+  $('ability').disabled = sim.mode !== 'play' || sim.abilityCooldown > 0;
+  $('ability').style.setProperty('--charge', `${(1 - sim.abilityCooldown / ability.cooldown) * 100}%`);
+  $('ability-icon').textContent = sim.abilityCooldown > 0 ? Math.ceil(sim.abilityCooldown) : ability.icon;
+  $('ability-name').textContent = ability.name;
+  $('ability').setAttribute('aria-label', `${ability.name} — Q${sim.abilityCooldown > 0 ? `, готово через ${Math.ceil(sim.abilityCooldown)} с` : ', готово'}`);
+  const remainingMissions = sim.missions.filter(m => !m.done);
+  missionFocus = Math.min(missionFocus, Math.max(0, remainingMissions.length - 1));
+  const mission = remainingMissions[missionFocus];
+  $('mission-count').textContent = `${sim.missionsDone}/3`;
+  $('mission-title').textContent = mission ? mission.title : 'Все задания закрыты!';
+  $('mission-progress').textContent = mission ? `${Math.floor(mission.progress)}/${mission.target}` : '+750 И ЩИТ';
+  $('mission-fill').style.width = `${mission ? mission.progress / mission.target * 100 : 100}%`;
+  $('mission-hud').classList.toggle('done', !mission && sim.missions.length > 0);
+  const buffs = [sim.shield && '◇ Щит', sim.magnet > 0 && `🧲 ${Math.ceil(sim.magnet)} с`, sim.slow > 0 && `◷ ${Math.ceil(sim.slow)} с`, sim.spicy > 0 && `🌶 ×2 · ${Math.ceil(sim.spicy)} с`, sim.dash > 0 && `⚡ ${Math.ceil(sim.dash)} с`].filter(Boolean).join(' · ');
+  if (buffKey !== buffs) { buffKey = buffs; $('buff-hud').textContent = buffs; }
+  $('buff-hud').hidden = !buffs;
+  root.classList.toggle('slow-motion', sim.slow > 0 && sim.mode === 'play');
   $('heat').classList.toggle('hot', sim.power > 0);
   $('heat-fill').style.width = `${sim.power > 0 ? sim.power / 8 * 100 : sim.heat * 10}%`;
   $('heat-label').textContent = sim.power > 0 ? `РЕЖИМ «ПОФИГ» · ${Math.ceil(sim.power)} СЕК` : `ЕЩЁ ${10 - sim.heat} ЛАТЯО ДО РЕЖИМА «ПОФИГ»`;
-  $('speed-lines').classList.toggle('on', sim.power > 0 && sim.mode === 'play');
+  $('speed-lines').classList.toggle('on', (sim.invincible || sim.spicy > 0) && sim.mode === 'play');
   if (clock >= bubbleUntil) $('reaction').hidden = true;
   if (clock > currentComicTimer) $('comic').classList.remove('show');
   if (clock > milestoneTimer) $('milestone').classList.remove('show');
+  if (clock > routeUntil) $('route-callout').hidden = true;
   $('controls-hint').style.opacity = playedSeconds > 9 ? '0' : '1';
 }
 
@@ -521,6 +606,12 @@ selectSkin(selectedSkin.id, false);
 $('start').onclick = () => sim.mode === 'paused' ? pause() : start();
 $('pause').onclick = pause;
 $('sound').onclick = toggleSound;
+$('ability').onclick = activateAbility;
+$('mission-hud').onclick = () => {
+  const remaining = sim.missions.filter(m => !m.done).length;
+  if (remaining > 1) missionFocus = (missionFocus + 1) % remaining;
+  canvas.focus({ preventScroll: true });
+};
 $('mog').onclick = () => { initAudio(); mariaShout(); };
 $('preview-flight').onclick = beginOrbit;
 $('orbit-close').onclick = () => orbit.finish();
@@ -535,6 +626,7 @@ addEventListener('keydown', e => {
   if (['p', 'P', 'з', 'Escape'].includes(e.key) && !e.repeat) pause();
   if (['m', 'M', 'ь'].includes(e.key) && !e.repeat) toggleSound();
   if (['e', 'E', 'у'].includes(e.key) && !e.repeat) { initAudio(); mariaShout(); }
+  if (['q', 'Q', 'й', 'Й'].includes(e.key) && !e.repeat) activateAbility();
   if (e.key === 'Enter' && (sim.mode === 'ready' || sim.mode === 'over')) start();
 });
 document.querySelectorAll('[data-action]').forEach(button => {
@@ -578,7 +670,7 @@ function animate(now) {
     trackPhase = (trackPhase + movement) % 2.6;
     updateSleepers();
     flameTimer -= dt;
-    if (sim.power > 0 && flameTimer <= 0) {
+    if (sim.invincible && flameTimer <= 0) {
       flameTimer = .07;
       burst(sim.x + (Math.random() - .5) * .6, .4 + Math.random() * .7, .6, Math.random() < .5 ? '#ff8951' : '#f5e56b', 3, .45);
     }
@@ -596,7 +688,7 @@ function animate(now) {
   if (sim.mode === 'ready' && clock >= moodUntil) expression = Math.floor(time / 4) % 2 ? 'smug' : 'happy';
   karina.update(time, paused ? 0 : dt, {
     playing: wasPlaying && !paused && !orbit.active, mood: expression, speaking: clock < speakingUntil,
-    reaction, flying: sim.jetpack > 0 || orbit.active, orbit: orbit.active, meme: selectedSkin.special === '67' && clock < gestureUntil, jump: sim.jump, slide: sim.slide > 0 && !menu, power: sim.power > 0 && !menu, lean: menu ? 0 : sim.lean, menu: menu || orbit.active
+    reaction, flying: sim.jetpack > 0 || orbit.active, orbit: orbit.active, meme: selectedSkin.special === '67' && clock < gestureUntil, jump: sim.jump || sim.bounce, slide: sim.slide > 0 && !menu, power: sim.invincible && !menu, lean: menu ? 0 : sim.lean, menu: menu || orbit.active
   });
   deadline.visible = sim.mode !== 'ready';
   deadline.position.set(sim.x * .7 + Math.sin(time * 3) * .15, Math.abs(Math.sin(time * 7)) * .12, menu ? 2.6 : 5.2);
@@ -606,15 +698,19 @@ function animate(now) {
     if (W < 650) { cameraTarget.set(3.0, 3.2, 8.2); lookTarget.set(.7, .5, 0); }
     else { cameraTarget.set(3.7, 3.25, 7.1); lookTarget.set(-.9, 1.9, 0); }
   } else {
-    cameraTarget.set(sim.x * .30, (sim.jetpack > 0 ? 8.5 : 4.8) + (sim.power > 0 ? .2 : 0), 9.2);
-    lookTarget.set(sim.x * .15, sim.jetpack > 0 ? 4.5 : 1.25, -11);
+    const narrow = W / H < .85;
+    cameraTarget.set(sim.x * (narrow ? .82 : .30), (sim.jetpack > 0 ? 8.5 : (narrow ? 5.1 : 4.8) + sim.y * .4) + (sim.invincible ? .2 : 0), narrow ? 10.6 : 9.2);
+    lookTarget.set(sim.x * (narrow ? .65 : .15), sim.jetpack > 0 ? 4.5 : 1.25 + sim.y * .25, -11);
   }
-  camera.position.lerp(cameraTarget, Math.min(1, dt * 4));
+  camera.position.lerp(cameraTarget, Math.min(1, dt * (!menu && W / H < .85 ? 8 : 4)));
   if (clock < shakeUntil) { camera.position.x += (Math.random() - .5) * .18; camera.position.y += (Math.random() - .5) * .12; }
-  camera.fov += ((sim.power > 0 && !menu ? 65 : 56) - camera.fov) * Math.min(1, dt * 4);
+  const narrowView = W / H < .85 && !menu;
+  const targetFov = (sim.invincible || sim.spicy > 0) && !menu ? narrowView ? 68 : 65 : sim.slow > 0 && !menu ? narrowView ? 57 : 51 : narrowView ? 61 : 56;
+  camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 4);
   camera.updateProjectionMatrix(); camera.lookAt(lookTarget);
   syncItems(time);
   city.update(sim.distance, time, paused || orbit.active ? 0 : dt);
+  gameplayEffects.update(sim, time, paused || orbit.active ? 0 : dt, orbit.active);
   if (!paused) animateParticles(dt);
   updateUI();
   scene.updateMatrixWorld();

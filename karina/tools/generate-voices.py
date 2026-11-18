@@ -7,12 +7,20 @@ import subprocess
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--scratch', type=Path, required=True)
+parser.add_argument('--only-missing', action='store_true', help='Keep matching, previously rendered clips')
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
 args.scratch.mkdir(parents=True, exist_ok=True)
 source = json.loads((root / 'voice-lines.json').read_text())
 manifest = {}
 jobs = []
+previous = {}
+if args.only_missing and (root / 'voice-manifest.js').exists():
+    data = (root / 'voice-manifest.js').read_text().split('export const DIALOGUE = ', 1)[1].strip().removesuffix(';')
+    for events in json.loads(data).values():
+        for clips in events.values():
+            for clip in clips:
+                previous[clip['src']] = clip
 for character, profile in source.items():
     manifest[character] = {}
     seen = {}
@@ -23,7 +31,11 @@ for character, profile in source.items():
                 name = f'{event.lower()}-{index}'
                 clip = {'text': text, 'src': f'voices/{character}/{name}.m4a'}
                 seen[text] = clip
-                jobs.append((character, profile, name, clip))
+                old = previous.get(clip['src'])
+                if old and old['text'] == text and (root / clip['src']).exists():
+                    clip['duration'] = old['duration']
+                else:
+                    jobs.append((character, profile, name, clip))
             manifest[character][event].append(seen[text])
 
 def generate(job):
@@ -51,4 +63,5 @@ with ThreadPoolExecutor(max_workers=3) as pool:
         character, name = future.result()
         print(f'{index}/{len(jobs)} {character}/{name}', flush=True)
 (root / 'voice-manifest.js').write_text('// Pre-rendered synthetic dialogue. Regenerate with tools/generate-voices.py.\nexport const DIALOGUE = ' + json.dumps(manifest, ensure_ascii=False, indent=2) + ';\n')
-print(f'Ready: {len(jobs)} AAC clips with duration metadata.', flush=True)
+total = len({clip['src'] for events in manifest.values() for clips in events.values() for clip in clips})
+print(f'Ready: {total} AAC clips with duration metadata ({len(jobs)} rendered).', flush=True)

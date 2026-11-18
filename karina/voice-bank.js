@@ -1,4 +1,4 @@
-import { DIALOGUE } from './voice-manifest.js?v=flight-4';
+import { DIALOGUE } from './voice-manifest.js?v=chaos-1';
 
 export { DIALOGUE };
 export class VoiceBank {
@@ -32,7 +32,7 @@ export class VoiceBank {
   }
   warm(character) {
     if (!this.getContext()) return;
-    const clips = ['start', 'special', 'jetpack', 'orbit'].flatMap(event => this.choices(character, event));
+    const clips = ['start', 'special', 'jetpack', 'orbit', 'ability'].flatMap(event => this.choices(character, event));
     for (const clip of clips) this.load(clip);
   }
   stop() {
