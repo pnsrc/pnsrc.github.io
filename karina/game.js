@@ -4,6 +4,7 @@ import { createKarina } from './character.js?v=flight-4';
 import { SKINS, findSkin } from './skins.js?v=flight-4';
 import { VoiceBank } from './voice-bank.js?v=flight-4';
 import { makeJetpack, OrbitMeme } from './flight.js?v=flight-4';
+import { OmskWorld } from './omsk-world.js?v=omsk-2';
 
 const $ = id => document.getElementById(id);
 const root = $('game');
@@ -24,9 +25,9 @@ renderer.outputColorSpace = T.SRGBColorSpace;
 renderer.toneMapping = T.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.3;
 const scene = new T.Scene();
-scene.background = new T.Color('#657588');
-scene.fog = new T.Fog('#657588', 38, 115);
-const camera = new T.PerspectiveCamera(56, 1, .1, 180);
+scene.background = new T.Color('#9ab3c3');
+scene.fog = new T.Fog('#9ab3c3', 65, 210);
+const camera = new T.PerspectiveCamera(56, 1, .1, 245);
 scene.add(new T.HemisphereLight('#cbf4ef', '#776074', 2.6));
 const sunlight = new T.DirectionalLight('#ffdfb4', 3.4);
 sunlight.position.set(-12, 22, 8);
@@ -132,42 +133,8 @@ function updateSleepers() {
 }
 updateSleepers();
 
-const chunks = [];
-for (let i = 0; i < 11; i++) {
-  const chunk = new T.Group(); chunk.position.z = 12 - i * 12; scene.add(chunk); chunks.push(chunk);
-  for (const side of [-1, 1]) {
-    const height = 7 + ((i * 7 + (side + 1) * 2) % 10);
-    const x = side * 10;
-    const color = ['#395668', '#406e71', '#5b6577', '#937b72'][i % 4];
-    box(6, height, 10, color, x, height / 2, 0, chunk);
-    box(6.25, .25, 10.1, '#c1a48d', x, height + .1, 0, chunk);
-    box(6.2, 2, .8, ['#d77565', '#598a86', '#8a798a'][i % 3], x, 1, 4.8, chunk);
-    const winCount = Math.floor((height - 3) / 2) * 3;
-    const windows = new T.InstancedMesh(boxGeo, mat(i % 2 ? '#e9ca96' : '#9bc3c0', .12), winCount);
-    chunk.add(windows);
-    for (let w = 0; w < winCount; w++) {
-      dummy.position.set(x + (w % 3 - 1) * 1.6, 3.8 + Math.floor(w / 3) * 2, 5.02);
-      dummy.scale.set(.65, .94, .04); dummy.updateMatrix(); windows.setMatrixAt(w, dummy.matrix);
-    }
-    box(.13, 4.6, .13, '#354752', side * 5.8, 2.3, 1.5, chunk);
-    ball(.35, '#ff6349', side * 5.8, 4.3, 1.5, chunk, [1.05, 1.3, 1], .24);
-    box(.16, .18, .16, '#f3c47e', side * 5.8, 3.74, 1.5, chunk);
-    if (i % 2 === 0) sign(side < 0 ? '辣条' : '夜市', 2.8, 1.3, x, 2.65, 5.08, chunk, i % 3 ? '#b54842' : '#e2b762', i % 3 ? '#fff1d0' : '#384555');
-    if (i % 3 === 0) {
-      const board = box(.08, 3.8, 1, '#d86b5c', side * 7.1, 4.2, 4, chunk);
-      const tag = sign('吃辣', .95, 2.8, side * 7.04, 4.3, 4.02, chunk, '#c64e41');
-      tag.rotation.z = .04 * side;
-    }
-  }
-  if (i % 3 === 0) {
-    box(12, .04, .04, '#293f49', 0, 7, -2, chunk);
-    for (let j = -2; j <= 2; j++) {
-      box(.02, .7, .02, '#293f49', j * 2, 6.65, -2, chunk);
-      ball(.30, '#ff7952', j * 2, 6.1, -2, chunk, [1, 1.25, 1], .22);
-    }
-  }
-}
-ball(7, '#ffdcb1', -25, 32, -115, scene, [1, 1, 1], .7);
+const city = new OmskWorld(scene, () => syncSkinReadiness());
+ball(7, '#ffe2b0', -45, 52, -190, scene, [1, 1, 1], .7);
 
 // Each skin owns a texture and a rig; switching never changes the current run.
 const rigs = new Map();
@@ -198,16 +165,19 @@ karina = rigs.get(selectedSkin.id);
 
 function syncSkinReadiness() {
   const state = skinLoadState.get(selectedSkin.id);
-  const ready = !!state?.ready;
+  const ready = !!state?.ready && !city.loading;
   $('start').disabled = !ready;
-  for (const [id, rig] of rigs) rig.group.visible = id === selectedSkin.id && ready;
+  $('preview-flight').disabled = !ready;
+  for (const [id, rig] of rigs) rig.group.visible = id === selectedSkin.id && !!state?.ready;
   $('start-label').textContent = ready
     ? sim.mode === 'paused' ? 'ПРОДОЛЖИТЬ' : sim.mode === 'over' ? 'ЕЩЁ ПО ЗАКУСОЧКЕ' : 'ПОГНАЛИ'
-    : state?.error ? 'СКИН НЕДОСТУПЕН' : 'ЗАГРУЖАЮ СКИН…';
-  $('skin-status').hidden = ready;
+    : state?.error ? 'СКИН НЕДОСТУПЕН' : city.loading ? 'ГОТОВЛЮ ОМСК…' : 'ЗАГРУЖАЮ СКИН…';
+  $('skin-status').hidden = ready && !city.errors.length;
   $('skin-status').textContent = state?.error
     ? 'Персонаж не загрузился. Выбери другого или обнови страницу.'
-    : 'Секунду, персонаж переодевается…';
+    : city.loading ? `Город собирается: ${city.loaded} из ${city.total}.`
+      : city.errors.length ? 'Часть города не загрузилась. Обнови страницу, чтобы увидеть всё.'
+        : 'Секунду, персонаж переодевается…';
   document.querySelectorAll('button[data-skin]').forEach(button => {
     button.setAttribute('aria-busy', String(!skinLoadState.get(button.dataset.skin)?.ready));
   });
@@ -421,7 +391,7 @@ function resetEffects() {
   particles.length = 0;
 }
 function start() {
-  if (!skinLoadState.get(selectedSkin.id)?.ready) return;
+  if (city.loading || !skinLoadState.get(selectedSkin.id)?.ready) return;
   initAudio(); resetEffects(); sim.start();
   playedSeconds = 0;
   root.dataset.mode = 'play'; $('menu').hidden = true;
@@ -606,7 +576,6 @@ function animate(now) {
     }
     const movement = sim.distance - previousDistance;
     trackPhase = (trackPhase + movement) % 2.6;
-    for (const chunk of chunks) { chunk.position.z += movement; if (chunk.position.z > 24) chunk.position.z -= 132; }
     updateSleepers();
     flameTimer -= dt;
     if (sim.power > 0 && flameTimer <= 0) {
@@ -645,6 +614,7 @@ function animate(now) {
   camera.fov += ((sim.power > 0 && !menu ? 65 : 56) - camera.fov) * Math.min(1, dt * 4);
   camera.updateProjectionMatrix(); camera.lookAt(lookTarget);
   syncItems(time);
+  city.update(sim.distance, time, paused || orbit.active ? 0 : dt);
   if (!paused) animateParticles(dt);
   updateUI();
   scene.updateMatrixWorld();
