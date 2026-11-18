@@ -1,5 +1,5 @@
 import * as T from './three.module.js';
-import { RunnerGame, ABILITIES } from './runner.js?v=chaos-1';
+import { RunnerGame, ABILITIES } from './runner.js?v=chaos-2';
 import { createKarina } from './character.js?v=flight-4';
 import { SKINS, findSkin } from './skins.js?v=flight-4';
 import { VoiceBank } from './voice-bank.js?v=chaos-1';

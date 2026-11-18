@@ -221,8 +221,11 @@ export class RunnerGame {
       const airborne = this.jetpack > 0 || flying || this.bounce > 0 || bouncing;
       const coinInReach = Math.abs(this.y - (item.altitude || 0)) < 1.8;
       const magnetic = this.magnet > 0 && item.type === 'coin' && item.z > -10 && item.z < 1 && coinInReach;
-      if (item.type === 'coin' && (magnetic || (touching && deltaX < 1.03 && coinInReach))) this.collect(item);
-      else if (touching && deltaX < 1.03) {
+      if (item.type === 'coin') {
+        if (magnetic || (touching && deltaX < 1.03 && coinInReach)) this.collect(item);
+        continue;
+      }
+      if (touching && deltaX < 1.03) {
         if (!OBSTACLES.has(item.type)) {
           if (!airborne || item.type === 'jetpack') this.pickup(item);
         } else {

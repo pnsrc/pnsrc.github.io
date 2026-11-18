@@ -20,6 +20,18 @@ test('magnet collects all lanes at the same height; it cannot pick up ground sna
   step(g, .01); assert.equal(g.coins, 3); assert.equal(g.items[0].altitude, undefined);
 });
 
+test('unreachable aerial snacks after landing are ignored and never become fake bonuses', () => {
+  const g = game();
+  g.missions = [{ key: 'boost', title: 'Collect bonuses', target: 2, progress: 0, done: false }];
+  for (let i = 0; i < 5; i++) g.add(1, -1 - i * .15, 'coin', { altitude: 3.8 });
+  const events = step(g, .2);
+  assert.equal(g.coins, 0); assert.equal(g.stats.boost, undefined);
+  assert.equal(g.missions[0].progress, 0);
+  assert.ok(!events.some(e => e.type === 'boost' || e.type === 'coin' || e.type === 'mission'));
+  g.add(1, -1, 'magnet'); assert.ok(step(g, .1).some(e => e.type === 'boost' && e.kind === 'magnet'));
+  assert.equal(g.stats.boost, 1);
+});
+
 test('shield absorbs exactly one crash and grace prevents an immediate second hit', () => {
   const g = game(); g.shield = 1; g.add(1, -1, 'train');
   const events = step(g, .1);
